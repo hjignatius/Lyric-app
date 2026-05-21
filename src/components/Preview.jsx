@@ -1,42 +1,21 @@
 import { parseChordPro } from '../utils/chordPro';
 
 function ChordLine({ segments }) {
+  // Render each chord+lyric pair as its own vertical column so they
+  // share the exact same width and stay perfectly aligned. Using a
+  // monospace font for both rows keeps character widths consistent.
   return (
-    <div className="mb-1">
-      {/* Chords row */}
-      <div className="flex flex-wrap leading-none">
-        {segments.map((seg, i) => {
-          const chordLen = (seg.chord?.length || 0) * 9 + 8;
-          const textLen = (seg.text?.length || 0) * 8;
-          const width = Math.max(chordLen, textLen, 16);
-          return (
-            <span
-              key={i}
-              className="inline-block text-violet-600 font-bold text-sm leading-tight"
-              style={{ minWidth: width }}
-            >
-              {seg.chord || ''}
-            </span>
-          );
-        })}
-      </div>
-      {/* Lyrics row */}
-      <div className="flex flex-wrap leading-snug">
-        {segments.map((seg, i) => {
-          const chordLen = (seg.chord?.length || 0) * 9 + 8;
-          const textLen = (seg.text?.length || 0) * 8;
-          const width = Math.max(chordLen, textLen, 16);
-          return (
-            <span
-              key={i}
-              className="inline-block text-gray-800 text-base font-mono"
-              style={{ minWidth: width }}
-            >
-              {seg.text || ''}
-            </span>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap mb-1 font-mono">
+      {segments.map((seg, i) => (
+        <div key={i} className="flex flex-col" style={{ whiteSpace: 'pre' }}>
+          <span className="text-violet-600 font-bold text-sm leading-tight h-4">
+            {seg.chord ? seg.chord + ' ' : ' '}
+          </span>
+          <span className="text-gray-800 text-base leading-snug">
+            {seg.text || ' '}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

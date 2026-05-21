@@ -33,18 +33,18 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   lineContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 2,
   },
-  chordsRow: {
-    flexDirection: 'row',
-  },
-  lyricsRow: {
-    flexDirection: 'row',
+  segment: {
+    flexDirection: 'column',
   },
   chordText: {
     fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Courier-Bold',
     color: '#7c3aed',
+    height: 12,
   },
   lyricText: {
     fontSize: 12,
@@ -71,36 +71,22 @@ const styles = StyleSheet.create({
   },
 });
 
-function measureChordWidth(chord) {
-  return Math.max((chord?.length || 0) * 6.5 + 4, 20);
-}
-
-function measureLyricWidth(text) {
-  return Math.max((text?.length || 0) * 7, 1);
-}
-
 function ChordLine({ segments }) {
-  const items = segments.map(seg => ({
-    ...seg,
-    w: Math.max(measureChordWidth(seg.chord), measureLyricWidth(seg.text)),
-  }));
-
+  // Render each chord+lyric pair as its own vertical column so they
+  // share the exact same column width. Using Courier (monospace) for
+  // both rows means character widths are consistent and predictable.
   return (
     <View style={styles.lineContainer}>
-      <View style={styles.chordsRow}>
-        {items.map((seg, i) => (
-          <Text key={i} style={[styles.chordText, { minWidth: seg.w }]}>
-            {seg.chord || ' '}
+      {segments.map((seg, i) => (
+        <View key={i} style={styles.segment}>
+          <Text style={styles.chordText}>
+            {seg.chord ? seg.chord + ' ' : ' '}
           </Text>
-        ))}
-      </View>
-      <View style={styles.lyricsRow}>
-        {items.map((seg, i) => (
-          <Text key={i} style={[styles.lyricText, { minWidth: seg.w }]}>
+          <Text style={styles.lyricText}>
             {seg.text || ' '}
           </Text>
-        ))}
-      </View>
+        </View>
+      ))}
     </View>
   );
 }
