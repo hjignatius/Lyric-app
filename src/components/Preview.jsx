@@ -1,4 +1,18 @@
+import { Fragment } from 'react';
 import { parseChordPro } from '../utils/chordPro';
+import { computePageBreaks } from '../utils/pageBreaks';
+
+function PageBreak({ pageNumber }) {
+  return (
+    <div className="flex items-center gap-3 my-4 select-none" aria-label={`Page ${pageNumber} starts here`}>
+      <div className="flex-1 border-t border-dashed border-violet-300" />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full font-sans">
+        Page {pageNumber}
+      </span>
+      <div className="flex-1 border-t border-dashed border-violet-300" />
+    </div>
+  );
+}
 
 function ChordLine({ segments }) {
   // Render each chord+lyric pair as its own vertical column so they
@@ -22,6 +36,7 @@ function ChordLine({ segments }) {
 
 export default function Preview({ text, metadata }) {
   const lines = parseChordPro(text || '');
+  const breaks = new Set(computePageBreaks(lines, metadata));
   const { title, artist, key, tempo } = metadata;
 
   const isEmpty = !text?.trim();
@@ -54,27 +69,44 @@ export default function Preview({ text, metadata }) {
             )}
 
             {/* Song body */}
-            {lines.map((line, i) => {
-              if (line.type === 'empty') {
-                return <div key={i} className="h-4" />;
-              }
-              if (line.type === 'comment') {
+            {(() => {
+              let pageNumber = 1;
+              return lines.map((line, i) => {
+                const breakBefore = breaks.has(i);
+                if (breakBefore) pageNumber++;
+                const pageBreakEl = breakBefore ? (
+                  <PageBreak key={`pb-${i}`} pageNumber={pageNumber} />
+                ) : null;
+
+                let lineEl;
+                if (line.type === 'empty') {
+                  lineEl = <div key={i} className="h-4" />;
+                } else if (line.type === 'comment') {
+                  lineEl = (
+                    <p key={i} className="text-violet-500 font-bold text-xs uppercase tracking-widest mt-4 mb-1 font-sans">
+                      {line.text}
+                    </p>
+                  );
+                } else if (line.type === 'directive') {
+                  lineEl = null;
+                } else if (line.type === 'chords') {
+                  lineEl = <ChordLine key={i} segments={line.segments} />;
+                } else {
+                  lineEl = (
+                    <div key={i} className="text-gray-800 text-base font-mono mb-1">
+                      {line.segments?.[0]?.text || ''}
+                    </div>
+                  );
+                }
+
                 return (
-                  <p key={i} className="text-violet-500 font-bold text-xs uppercase tracking-widest mt-4 mb-1 font-sans">
-                    {line.text}
-                  </p>
+                  <Fragment key={i}>
+                    {pageBreakEl}
+                    {lineEl}
+                  </Fragment>
                 );
-              }
-              if (line.type === 'directive') return null;
-              if (line.type === 'chords') {
-                return <ChordLine key={i} segments={line.segments} />;
-              }
-              return (
-                <div key={i} className="text-gray-800 text-base font-mono mb-1">
-                  {line.segments?.[0]?.text || ''}
-                </div>
-              );
-            })}
+              });
+            })()}
           </>
         )}
       </div>
