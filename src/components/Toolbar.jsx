@@ -1,8 +1,18 @@
 import { transposeText } from '../utils/transpose';
 import { exportToPdf } from '../utils/pdfExport';
-import { useState } from 'react';
+import SongLibrary from './SongLibrary';
+import { useEffect, useState } from 'react';
 
-export default function Toolbar({ text, onChange, metadata }) {
+export default function Toolbar({
+  text,
+  onChange,
+  metadata,
+  currentId,
+  onLoadSong,
+  onNewSong,
+  onSavedId,
+  autosavedAt,
+}) {
   const [semitones, setSemitones] = useState(0);
   const [useFlats, setUseFlats] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -28,6 +38,15 @@ export default function Toolbar({ text, onChange, metadata }) {
       setExporting(false);
     }
   }
+
+  // Briefly show "Saved" after autosave fires, then fade to nothing.
+  const [showSaved, setShowSaved] = useState(false);
+  useEffect(() => {
+    if (!autosavedAt) return;
+    setShowSaved(true);
+    const t = setTimeout(() => setShowSaved(false), 1200);
+    return () => clearTimeout(t);
+  }, [autosavedAt]);
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -80,6 +99,24 @@ export default function Toolbar({ text, onChange, metadata }) {
       </div>
 
       <div className="flex-1" />
+
+      {/* Autosave indicator */}
+      <span
+        className={`text-xs text-gray-400 transition-opacity duration-500 ${showSaved ? 'opacity-100' : 'opacity-0'}`}
+        aria-live="polite"
+      >
+        ✓ Autosaved
+      </span>
+
+      {/* Song library */}
+      <SongLibrary
+        text={text}
+        metadata={metadata}
+        currentId={currentId}
+        onLoad={onLoadSong}
+        onNew={onNewSong}
+        onSavedId={onSavedId}
+      />
 
       {/* Export button */}
       <button
