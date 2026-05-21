@@ -12,6 +12,10 @@ export default function Toolbar({
   onNewSong,
   onSavedId,
   autosavedAt,
+  fitToOnePage,
+  onToggleFit,
+  fitInfo,
+  activeScale,
 }) {
   const [semitones, setSemitones] = useState(0);
   const [useFlats, setUseFlats] = useState(false);
@@ -33,11 +37,19 @@ export default function Toolbar({
   async function handleExport() {
     setExporting(true);
     try {
-      await exportToPdf(metadata, text);
+      await exportToPdf(metadata, text, { scale: activeScale });
     } finally {
       setExporting(false);
     }
   }
+
+  // Tooltip + label for the fit-to-page button.
+  const fitDisabled = !fitInfo?.needed; // nothing to do — already fits
+  const fitTooBig = fitInfo?.needed && !fitInfo?.fits;
+  let fitLabel = 'Fit to 1 page';
+  if (fitToOnePage) fitLabel = `Fitting · ${Math.round(activeScale * 100)}%`;
+  else if (fitInfo?.needed && fitInfo?.fits) fitLabel = `Fit to 1 page (${Math.round(fitInfo.scale * 100)}%)`;
+  else if (!fitInfo?.needed) fitLabel = '✓ Fits on 1 page';
 
   // Briefly show "Saved" after autosave fires, then fade to nothing.
   const [showSaved, setShowSaved] = useState(false);
@@ -80,6 +92,31 @@ export default function Toolbar({
           </button>
         )}
       </div>
+
+      {/* Fit-to-one-page toggle */}
+      <button
+        onClick={onToggleFit}
+        disabled={fitDisabled && !fitToOnePage}
+        title={
+          fitTooBig
+            ? 'Song is too long to fit on one page even at minimum scale'
+            : fitDisabled
+              ? 'Already fits on one page'
+              : 'Shrink content so it fits on one PDF page'
+        }
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+          fitToOnePage
+            ? 'bg-violet-600 text-white border-violet-600 hover:bg-violet-700'
+            : fitDisabled
+              ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+              : 'border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50'
+        } ${fitTooBig && fitToOnePage ? 'border-amber-300 bg-amber-50 text-amber-700' : ''}`}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m-4 12h2a2 2 0 002-2v-2" />
+        </svg>
+        {fitLabel}
+      </button>
 
       {/* Sharps / Flats toggle */}
       <div className="flex items-center gap-2">

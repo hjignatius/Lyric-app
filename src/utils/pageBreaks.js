@@ -45,12 +45,12 @@ function headerHeight(metadata) {
  * occurs immediately before that line. e.g. [42, 78] means line 42
  * is the first line of page 2 and line 78 is the first line of page 3.
  */
-export function computePageBreaks(parsedLines, metadata) {
+export function computePageBreaks(parsedLines, metadata, scale = 1) {
   const breaks = [];
-  let cursor = headerHeight(metadata);
+  let cursor = headerHeight(metadata) * scale;
 
   for (let i = 0; i < parsedLines.length; i++) {
-    const h = HEIGHTS[parsedLines[i].type] ?? HEIGHTS.lyrics;
+    const h = (HEIGHTS[parsedLines[i].type] ?? HEIGHTS.lyrics) * scale;
     if (cursor + h > CONTENT_HEIGHT_PT) {
       breaks.push(i);
       cursor = h;
@@ -60,4 +60,31 @@ export function computePageBreaks(parsedLines, metadata) {
   }
 
   return breaks;
+}
+
+// Don't shrink below this — text becomes hard to read.
+const MIN_FIT_SCALE = 0.55;
+
+/**
+ * Compute the largest scale ≤ 1 that fits the entire song on a single
+ * A4 page. Returns:
+ *   { scale: 1.0, fits: true,  needed: false } — already fits
+ *   { scale: s,   fits: true,  needed: true  } — shrinking required, possible
+ *   { scale: 0.55, fits: false, needed: true } — too long even at min scale
+ */
+export function computeFitScale(parsedLines, metadata) {
+  let total = headerHeight(metadata);
+  for (const line of parsedLines) {
+    total += HEIGHTS[line.type] ?? HEIGHTS.lyrics;
+  }
+
+  if (total <= CONTENT_HEIGHT_PT) {
+    return { scale: 1, fits: true, needed: false };
+  }
+
+  const ideal = CONTENT_HEIGHT_PT / total;
+  if (ideal < MIN_FIT_SCALE) {
+    return { scale: MIN_FIT_SCALE, fits: false, needed: true };
+  }
+  return { scale: ideal, fits: true, needed: true };
 }

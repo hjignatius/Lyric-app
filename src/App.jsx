@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import MetadataForm from './components/MetadataForm';
 import Editor from './components/Editor';
 import Preview from './components/Preview';
 import Toolbar from './components/Toolbar';
 import { loadCurrent, saveCurrent } from './utils/storage';
+import { parseChordPro } from './utils/chordPro';
+import { computeFitScale } from './utils/pageBreaks';
 import './index.css';
 
 const DEFAULT_METADATA = { title: '', artist: '', key: '', tempo: '' };
@@ -13,7 +15,12 @@ export default function App() {
   const [metadata, setMetadata] = useState(DEFAULT_METADATA);
   const [currentId, setCurrentId] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
+  const [fitToOnePage, setFitToOnePage] = useState(false);
   const hydrated = useRef(false);
+
+  const parsedLines = useMemo(() => parseChordPro(text || ''), [text]);
+  const fitInfo = useMemo(() => computeFitScale(parsedLines, metadata), [parsedLines, metadata]);
+  const activeScale = fitToOnePage ? fitInfo.scale : 1;
 
   // Restore the in-progress draft on first load.
   useEffect(() => {
@@ -75,6 +82,10 @@ export default function App() {
           onNewSong={handleNewSong}
           onSavedId={setCurrentId}
           autosavedAt={savedAt}
+          fitToOnePage={fitToOnePage}
+          onToggleFit={() => setFitToOnePage(v => !v)}
+          fitInfo={fitInfo}
+          activeScale={activeScale}
         />
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ minHeight: '420px' }}>
@@ -82,7 +93,12 @@ export default function App() {
             <Editor value={text} onChange={setText} />
           </div>
           <div className="border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <Preview text={text} metadata={metadata} />
+            <Preview
+              parsedLines={parsedLines}
+              text={text}
+              metadata={metadata}
+              scale={activeScale}
+            />
           </div>
         </div>
 
