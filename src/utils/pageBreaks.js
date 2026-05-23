@@ -18,8 +18,8 @@ const HEIGHTS = {
   chords: 12 + 12 * LINE_HEIGHT_MULT + 2,
   // plain lyric line: 12pt × 1.2 + margin 2
   lyrics: 12 * LINE_HEIGHT_MULT + 2,
-  // empty line spacer
-  empty: 8,
+  // empty line spacer — ~1.5x a lyric line for clear section separation
+  empty: 22,
   // section labels now live in the margin — no vertical height cost
   comment: 0,
   // directives don't render in the body

@@ -92,7 +92,7 @@ function buildStyles(scale) {
       marginBottom: 2 * s,
     },
     emptyLine: {
-      marginBottom: 8 * s,
+      marginBottom: 22 * s,
     },
   });
 }

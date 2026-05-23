@@ -136,7 +136,7 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
 
                 let content;
                 if (line.type === 'empty') {
-                  content = <div style={{ height: 8 * scale }} />;
+                  content = <div style={{ height: 22 * scale }} />;
                 } else if (line.type === 'directive') {
                   return null;
                 } else if (line.type === 'chords') {
