@@ -18,7 +18,6 @@ function buildStyles(scale) {
       backgroundColor: '#ffffff',
     },
     header: {
-      marginLeft: LABEL_COL * s,
       marginBottom: 24 * s,
       borderBottomWidth: 1,
       borderBottomColor: '#cccccc',
@@ -29,15 +28,18 @@ function buildStyles(scale) {
       fontFamily: 'Helvetica-Bold',
       color: '#1a1a2e',
       marginBottom: 4 * s,
+      textAlign: 'center',
     },
     artist: {
       fontSize: 10 * s,
       color: '#555555',
       marginBottom: 2 * s,
+      textAlign: 'center',
     },
     metaRow: {
       flexDirection: 'row',
       marginTop: 3 * s,
+      justifyContent: 'center',
     },
     meta: {
       fontSize: 8 * s,

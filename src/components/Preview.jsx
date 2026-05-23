@@ -113,10 +113,7 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
           <>
             {/* Song header — indented to match the content column */}
             {(title || artist) && (
-              <div
-                className="mb-5 pb-4 border-b border-gray-200"
-                style={{ marginLeft: LABEL_COL_PX + 5 }}
-              >
+              <div className="mb-5 pb-4 border-b border-gray-200 text-center">
                 {title && <h2 className="text-xl font-bold text-gray-900 font-sans">{title}</h2>}
                 {artist && <p className="text-xs text-gray-500 font-sans">{artist}</p>}
                 {(key || tempo) && (
