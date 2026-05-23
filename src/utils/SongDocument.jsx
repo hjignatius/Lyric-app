@@ -1,17 +1,24 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { attachSectionLabels } from './chordPro';
 
-// Build the stylesheet with all dimensional values multiplied by `scale`.
-// Page padding is left unscaled — we want the same A4 margin regardless,
-// so shrinking content alone is what creates more room.
+// Left page padding is reduced so the label column sits inside the margin.
+// Label col (40pt) + left padding (8pt) = 48pt — same content x-position as before.
+const LABEL_COL = 40;
+const PAGE_PAD_LEFT = 8;
+
 function buildStyles(scale) {
   const s = scale;
   return StyleSheet.create({
     page: {
-      padding: 48,
+      paddingTop: 48,
+      paddingRight: 48,
+      paddingBottom: 48,
+      paddingLeft: PAGE_PAD_LEFT,
       fontFamily: 'Helvetica',
       backgroundColor: '#ffffff',
     },
     header: {
+      marginLeft: LABEL_COL * s,
       marginBottom: 24 * s,
       borderBottomWidth: 1,
       borderBottomColor: '#cccccc',
@@ -36,6 +43,26 @@ function buildStyles(scale) {
       fontSize: 11 * s,
       color: '#888888',
       marginRight: 16 * s,
+    },
+    // Each body line is a row: [label col | content col]
+    bodyRow: {
+      flexDirection: 'row',
+    },
+    labelCol: {
+      width: LABEL_COL * s,
+      paddingRight: 4 * s,
+      justifyContent: 'center',
+      alignItems: 'flex-end',
+    },
+    labelText: {
+      fontSize: 7 * s,
+      fontFamily: 'Helvetica-Bold',
+      color: '#7c3aed',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    contentCol: {
+      flex: 1,
     },
     lineContainer: {
       flexDirection: 'row',
@@ -65,15 +92,6 @@ function buildStyles(scale) {
     emptyLine: {
       marginBottom: 8 * s,
     },
-    sectionLabel: {
-      fontSize: 11 * s,
-      fontFamily: 'Helvetica-Bold',
-      color: '#7c3aed',
-      marginBottom: 4 * s,
-      marginTop: 12 * s,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-    },
   });
 }
 
@@ -94,34 +112,66 @@ function ChordLine({ segments, styles }) {
   );
 }
 
+function BodyRow({ label, children, styles }) {
+  return (
+    <View style={styles.bodyRow}>
+      <View style={styles.labelCol}>
+        {label ? <Text style={styles.labelText}>{label}</Text> : null}
+      </View>
+      <View style={styles.contentCol}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
 export function SongDocument({ metadata, parsedLines, scale = 1 }) {
   const styles = buildStyles(scale);
   const { title, artist, key, tempo } = metadata;
+  const lines = attachSectionLabels(parsedLines);
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          {title ? <Text style={styles.title}>{title}</Text> : null}
-          {artist ? <Text style={styles.artist}>{artist}</Text> : null}
-          {(key || tempo) ? (
-            <View style={styles.metaRow}>
-              {key ? <Text style={styles.meta}>Key: {key}</Text> : null}
-              {tempo ? <Text style={styles.meta}>Tempo: {tempo} BPM</Text> : null}
-            </View>
-          ) : null}
-        </View>
+        {/* Header sits to the right of where the label column would be */}
+        {(title || artist || key || tempo) ? (
+          <View style={styles.header}>
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {artist ? <Text style={styles.artist}>{artist}</Text> : null}
+            {(key || tempo) ? (
+              <View style={styles.metaRow}>
+                {key ? <Text style={styles.meta}>Key: {key}</Text> : null}
+                {tempo ? <Text style={styles.meta}>Tempo: {tempo} BPM</Text> : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
+        {/* Body — each line is a [label | content] row */}
         <View>
-          {parsedLines.map((line, i) => {
-            if (line.type === 'empty') return <View key={i} style={styles.emptyLine} />;
-            if (line.type === 'comment') return <Text key={i} style={styles.sectionLabel}>{line.text}</Text>;
+          {lines.map((line, i) => {
+            if (line.type === 'empty') {
+              return (
+                <BodyRow key={i} label={null} styles={styles}>
+                  <View style={styles.emptyLine} />
+                </BodyRow>
+              );
+            }
             if (line.type === 'directive') return null;
-            if (line.type === 'chords') return <ChordLine key={i} segments={line.segments} styles={styles} />;
+            if (line.type === 'chords') {
+              return (
+                <BodyRow key={i} label={line.label} styles={styles}>
+                  <ChordLine segments={line.segments} styles={styles} />
+                </BodyRow>
+              );
+            }
+            // plain lyrics
             return (
-              <Text key={i} style={styles.plainLyricLine}>
-                {line.segments?.[0]?.text || ''}
-              </Text>
+              <BodyRow key={i} label={line.label} styles={styles}>
+                <Text style={styles.plainLyricLine}>
+                  {line.segments?.[0]?.text || ''}
+                </Text>
+              </BodyRow>
             );
           })}
         </View>

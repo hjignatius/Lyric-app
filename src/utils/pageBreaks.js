@@ -20,8 +20,8 @@ const HEIGHTS = {
   lyrics: 12 * LINE_HEIGHT_MULT + 2,
   // empty line spacer
   empty: 8,
-  // section label: marginTop 12 + 11pt × 1.2 + marginBottom 4
-  comment: 12 + 11 * LINE_HEIGHT_MULT + 4,
+  // section labels now live in the margin — no vertical height cost
+  comment: 0,
   // directives don't render in the body
   directive: 0,
 };

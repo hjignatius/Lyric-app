@@ -58,3 +58,28 @@ function parseLine(line) {
 export function hasChords(parsedLines) {
   return parsedLines.some(l => l.type === 'chords');
 }
+
+/**
+ * Attach each `comment` (section label) to the next non-empty content
+ * line as a `label` property, and drop empty lines that directly follow
+ * a label (they were only there for visual spacing, now unnecessary).
+ * Lines that aren't section-starters get `label: null`.
+ */
+export function attachSectionLabels(parsedLines) {
+  const result = [];
+  let pending = null;
+
+  for (const line of parsedLines) {
+    if (line.type === 'comment') {
+      pending = line.text;
+      continue;
+    }
+    if (line.type === 'empty' && pending) {
+      continue; // swallow spacer empties while holding a label
+    }
+    result.push({ ...line, label: pending });
+    pending = null;
+  }
+
+  return result;
+}

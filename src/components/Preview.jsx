@@ -1,14 +1,15 @@
 import { Fragment } from 'react';
+import { attachSectionLabels } from '../utils/chordPro';
 import { computePageBreaks } from '../utils/pageBreaks';
 
-// Default font sizes (px) for the preview body. Multiplied by `scale`
-// to implement shrink-to-fit without changing the layout structure.
 const BASE_CHORD_PX = 14;
 const BASE_LYRIC_PX = 16;
+// Label column width in px — mirrors the 40pt PDF column at screen resolution.
+const LABEL_COL_PX = 52;
 
 function PageBreak({ pageNumber }) {
   return (
-    <div className="flex items-center gap-3 my-4 select-none" aria-label={`Page ${pageNumber} starts here`}>
+    <div className="flex items-center gap-3 my-4 select-none">
       <div className="flex-1 border-t border-dashed border-violet-300" />
       <span className="text-[10px] font-bold uppercase tracking-widest text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full font-sans">
         Page {pageNumber}
@@ -18,14 +19,23 @@ function PageBreak({ pageNumber }) {
   );
 }
 
+function SectionLabel({ text, scale }) {
+  if (!text) return null;
+  return (
+    <span
+      className="font-bold font-sans uppercase text-violet-500 leading-none"
+      style={{ fontSize: 9 * scale, letterSpacing: '0.05em' }}
+    >
+      {text}
+    </span>
+  );
+}
+
 function ChordLine({ segments, scale }) {
-  // Each chord+lyric pair is its own vertical column so they share the
-  // exact same width and stay perfectly aligned. Monospace on both rows
-  // keeps character widths consistent.
   const chordPx = BASE_CHORD_PX * scale;
   const lyricPx = BASE_LYRIC_PX * scale;
   return (
-    <div className="flex flex-wrap mb-1 font-mono">
+    <div className="flex flex-wrap font-mono" style={{ marginBottom: 2 * scale }}>
       {segments.map((seg, i) => (
         <div key={i} className="flex flex-col" style={{ whiteSpace: 'pre' }}>
           <span
@@ -34,10 +44,7 @@ function ChordLine({ segments, scale }) {
           >
             {seg.chord ? seg.chord + ' ' : ' '}
           </span>
-          <span
-            className="text-gray-800 leading-snug"
-            style={{ fontSize: lyricPx }}
-          >
+          <span className="text-gray-800 leading-snug" style={{ fontSize: lyricPx }}>
             {seg.text || ' '}
           </span>
         </div>
@@ -46,13 +53,43 @@ function ChordLine({ segments, scale }) {
   );
 }
 
-export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
-  const lines = parsedLines;
-  const breaks = new Set(computePageBreaks(lines, metadata, scale));
-  const { title, artist, key, tempo } = metadata;
+// Wraps every body line in a [label col | content] flex row.
+function BodyRow({ label, scale, children }) {
+  return (
+    <div className="flex items-center">
+      <div
+        className="flex-shrink-0 flex items-center justify-end"
+        style={{ width: LABEL_COL_PX, paddingRight: 5 }}
+      >
+        <SectionLabel text={label} scale={scale} />
+      </div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
 
+export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
+  const lines = attachSectionLabels(parsedLines);
+  const breaks = new Set(computePageBreaks(parsedLines, metadata, scale));
+  const { title, artist, key, tempo } = metadata;
   const isEmpty = !text?.trim();
   const lyricPx = BASE_LYRIC_PX * scale;
+
+  // Map original parsedLines index → annotated lines index for page breaks.
+  // attachSectionLabels drops comment + their following empty lines, so we
+  // track which original indices survived.
+  const survivingOriginalIndices = (() => {
+    const out = [];
+    let pending = false;
+    for (let i = 0; i < parsedLines.length; i++) {
+      const t = parsedLines[i].type;
+      if (t === 'comment') { pending = true; continue; }
+      if (t === 'empty' && pending) continue;
+      pending = false;
+      out.push(i);
+    }
+    return out;
+  })();
 
   return (
     <div className="flex flex-col h-full">
@@ -64,16 +101,22 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-5 bg-white rounded-b-xl font-mono text-sm leading-relaxed">
+      <div
+        className="flex-1 overflow-y-auto bg-white rounded-b-xl"
+        style={{ padding: 20, paddingLeft: 4 }}
+      >
         {isEmpty ? (
-          <p className="text-gray-400 italic text-center mt-12">
+          <p className="text-gray-400 italic text-center mt-12 font-sans text-sm">
             Start typing in the editor to see a preview…
           </p>
         ) : (
           <>
-            {/* Song header */}
+            {/* Song header — indented to match the content column */}
             {(title || artist) && (
-              <div className="mb-5 pb-4 border-b border-gray-200">
+              <div
+                className="mb-5 pb-4 border-b border-gray-200"
+                style={{ marginLeft: LABEL_COL_PX + 5 }}
+              >
                 {title && <h2 className="text-xl font-bold text-gray-900 font-sans">{title}</h2>}
                 {artist && <p className="text-sm text-gray-500 font-sans">{artist}</p>}
                 {(key || tempo) && (
@@ -89,41 +132,32 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
             {/* Song body */}
             {(() => {
               let pageNumber = 1;
-              return lines.map((line, i) => {
-                const breakBefore = breaks.has(i);
+              return lines.map((line, annotatedIdx) => {
+                const originalIdx = survivingOriginalIndices[annotatedIdx];
+                const breakBefore = breaks.has(originalIdx);
                 if (breakBefore) pageNumber++;
-                const pageBreakEl = breakBefore ? (
-                  <PageBreak key={`pb-${i}`} pageNumber={pageNumber} />
-                ) : null;
 
-                let lineEl;
+                let content;
                 if (line.type === 'empty') {
-                  lineEl = <div style={{ height: 16 * scale }} />;
-                } else if (line.type === 'comment') {
-                  lineEl = (
-                    <p
-                      className="text-violet-500 font-bold uppercase tracking-widest mt-4 mb-1 font-sans"
-                      style={{ fontSize: 12 * scale }}
-                    >
-                      {line.text}
-                    </p>
-                  );
+                  content = <div style={{ height: 8 * scale }} />;
                 } else if (line.type === 'directive') {
-                  lineEl = null;
+                  return null;
                 } else if (line.type === 'chords') {
-                  lineEl = <ChordLine segments={line.segments} scale={scale} />;
+                  content = <ChordLine segments={line.segments} scale={scale} />;
                 } else {
-                  lineEl = (
-                    <div className="text-gray-800 font-mono mb-1" style={{ fontSize: lyricPx }}>
+                  content = (
+                    <div className="text-gray-800 font-mono" style={{ fontSize: lyricPx, marginBottom: 2 * scale }}>
                       {line.segments?.[0]?.text || ''}
                     </div>
                   );
                 }
 
                 return (
-                  <Fragment key={i}>
-                    {pageBreakEl}
-                    {lineEl}
+                  <Fragment key={annotatedIdx}>
+                    {breakBefore && <PageBreak pageNumber={pageNumber} />}
+                    <BodyRow label={line.label} scale={scale}>
+                      {content}
+                    </BodyRow>
                   </Fragment>
                 );
               });
