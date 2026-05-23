@@ -3,7 +3,7 @@ import { attachSectionLabels } from './chordPro';
 
 // Left page padding is reduced so the label column sits inside the margin.
 // Label col (40pt) + left padding (8pt) = 48pt — same content x-position as before.
-const LABEL_COL = 40;
+const LABEL_COL = 56;
 const PAGE_PAD_LEFT = 8;
 
 function buildStyles(scale) {
@@ -50,9 +50,9 @@ function buildStyles(scale) {
     },
     labelCol: {
       width: LABEL_COL * s,
-      paddingRight: 4 * s,
+      paddingLeft: 2 * s,
       justifyContent: 'center',
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
     },
     labelText: {
       fontSize: 7 * s,

@@ -5,7 +5,7 @@ import { computePageBreaks } from '../utils/pageBreaks';
 const BASE_CHORD_PX = 14;
 const BASE_LYRIC_PX = 16;
 // Label column width in px — mirrors the 40pt PDF column at screen resolution.
-const LABEL_COL_PX = 52;
+const LABEL_COL_PX = 72;
 
 function PageBreak({ pageNumber }) {
   return (
@@ -58,8 +58,8 @@ function BodyRow({ label, scale, children }) {
   return (
     <div className="flex items-center">
       <div
-        className="flex-shrink-0 flex items-center justify-end"
-        style={{ width: LABEL_COL_PX, paddingRight: 5 }}
+        className="flex-shrink-0 flex items-center justify-start"
+        style={{ width: LABEL_COL_PX, paddingLeft: 4 }}
       >
         <SectionLabel text={label} scale={scale} />
       </div>
