@@ -118,9 +118,9 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
                 style={{ marginLeft: LABEL_COL_PX + 5 }}
               >
                 {title && <h2 className="text-xl font-bold text-gray-900 font-sans">{title}</h2>}
-                {artist && <p className="text-sm text-gray-500 font-sans">{artist}</p>}
+                {artist && <p className="text-xs text-gray-500 font-sans">{artist}</p>}
                 {(key || tempo) && (
-                  <p className="text-xs text-gray-400 font-sans mt-1">
+                  <p className="font-sans mt-0.5 text-gray-400" style={{ fontSize: 10 }}>
                     {key && <>Key: <strong>{key}</strong></>}
                     {key && tempo && ' · '}
                     {tempo && <>Tempo: <strong>{tempo} BPM</strong></>}

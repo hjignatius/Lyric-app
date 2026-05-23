@@ -31,18 +31,18 @@ function buildStyles(scale) {
       marginBottom: 4 * s,
     },
     artist: {
-      fontSize: 13 * s,
+      fontSize: 10 * s,
       color: '#555555',
       marginBottom: 2 * s,
     },
     metaRow: {
       flexDirection: 'row',
-      marginTop: 4 * s,
+      marginTop: 3 * s,
     },
     meta: {
-      fontSize: 11 * s,
+      fontSize: 8 * s,
       color: '#888888',
-      marginRight: 16 * s,
+      marginRight: 12 * s,
     },
     // Each body line is a row: [label col | content col]
     bodyRow: {
