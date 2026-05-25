@@ -40,12 +40,11 @@ export default function PCloudLogin({ onClose, onSuccess }) {
       await loginCloud2FA(tfaHost.current, email.trim(), password, code);
       onSuccess();
     } catch (err) {
-      // 1022/2012/2294 = bad or missing code; otherwise show the real result.
+      const c = err?.result != null ? ` (${err.result})` : '';
       if ([1022, 2012, 2064, 2294].includes(err?.result)) {
-        setError('Incorrect code — check your authenticator app and try again.');
+        setError(`Incorrect code${c} — check your authenticator app and try again.`);
       } else {
-        const c = err?.result != null ? `pCloud ${err.result}: ` : '';
-        setError(`Verification failed — ${c}${err?.message || 'unknown error'}`);
+        setError(`Verification failed${c} — ${err?.message || 'unknown error'}`);
       }
       setBusy(false);
     }
