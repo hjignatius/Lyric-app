@@ -16,7 +16,6 @@ export default function Toolbar({
   onToggleFit,
   fitInfo,
   activeScale,
-  cloudConfigured,
   cloudConnected,
   onConnectCloud,
   onDisconnectCloud,
@@ -150,28 +149,26 @@ export default function Toolbar({
       </span>
 
       {/* pCloud connection */}
-      {cloudConfigured && (
-        cloudConnected ? (
-          <button
-            onClick={() => { if (confirm('Disconnect from pCloud? Songs stay in your pCloud; this device switches back to local storage.')) onDisconnectCloud(); }}
-            title="Connected to pCloud — click to disconnect"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            pCloud
-          </button>
-        ) : (
-          <button
-            onClick={onConnectCloud}
-            title="Sync your songs across devices via pCloud"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 001-9.9A5 5 0 005.1 8.1 4 4 0 003 15z" />
-            </svg>
-            Connect pCloud
-          </button>
-        )
+      {cloudConnected ? (
+        <button
+          onClick={() => { if (confirm('Disconnect from pCloud? Songs stay in your pCloud; this device switches back to local storage.')) onDisconnectCloud(); }}
+          title="Connected to pCloud — click to disconnect"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          pCloud
+        </button>
+      ) : (
+        <button
+          onClick={onConnectCloud}
+          title="Sync your songs across devices via pCloud"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 001-9.9A5 5 0 005.1 8.1 4 4 0 003 15z" />
+          </svg>
+          Connect pCloud
+        </button>
       )}
 
       {/* Song library */}

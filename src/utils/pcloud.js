@@ -1,23 +1,29 @@
 // pCloud REST client for a no-backend SPA.
 //
-// Auth is the OAuth2 implicit ("token") flow: we redirect the browser to
-// pCloud, the user approves, pCloud redirects back with an access_token and a
-// locationid telling us which data region the account lives in (1 = US,
-// 2 = EU). We persist both and talk directly to the region's API host from
-// the browser — there is no server in the middle.
+// Two ways to authenticate, both yielding a token we store and reuse:
 //
-// All song data lives as individual .json files in a /ChordSheet folder, so
-// it stays browsable in the normal pCloud apps.
+//   1. Direct login (default): email + password. We never send the raw
+//      password — pCloud issues a one-time `digest`, and we send
+//      sha1(password + sha1(lower(email)) + digest). Only the returned token
+//      is stored. No app/client-id registration needed.
+//   2. OAuth2 implicit flow (kept for the future, needs VITE_PCLOUD_CLIENT_ID):
+//      redirect to pCloud, come back with an access_token in the URL.
+//
+// pCloud has two data regions; the API host differs (1/US = api.pcloud.com,
+// 2/EU = eapi.pcloud.com). Direct login tries EU first then US; OAuth learns
+// the region from the redirect's locationid. All song data lives as individual
+// .json files in a /ChordSheet folder, so it stays browsable in pCloud's apps.
 
 const CLIENT_ID = import.meta.env.VITE_PCLOUD_CLIENT_ID || '';
 const AUTH_KEY = 'chordsheet:pcloud-auth';
 const SONG_FOLDER = '/ChordSheet';
 const AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 
-// locationid → API hostname. EU accounts must use eapi.* or calls 404/forbid.
 const HOSTS = { 1: 'api.pcloud.com', 2: 'eapi.pcloud.com' };
+const LOGIN_HOSTS = ['eapi.pcloud.com', 'api.pcloud.com']; // EU first
 
-export function isConfigured() {
+// True when the OAuth path is usable. Direct login never needs this.
+export function isOAuthConfigured() {
   return !!CLIENT_ID;
 }
 
@@ -29,26 +35,81 @@ export function getAuth() {
   }
 }
 
+// auth = { token, host, param }  — param is 'auth' (login) or 'access_token' (OAuth).
 function setAuth(auth) {
   localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
 }
 
 export function isConnected() {
   const a = getAuth();
-  return !!(a && a.access_token && a.host);
+  return !!(a && a.token && a.host);
 }
 
 export function disconnect() {
   localStorage.removeItem(AUTH_KEY);
 }
 
-// The page pCloud redirects back to. Must be registered verbatim in the
-// pCloud app's settings (both the localhost dev URL and the Vercel URL).
+function requireAuth() {
+  const auth = getAuth();
+  if (!auth?.token) throw new Error('Not connected to pCloud');
+  return auth;
+}
+
+async function sha1hex(str) {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function fetchJson(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`pCloud HTTP ${res.status}`);
+  return res.json();
+}
+
+// ---- Direct email/password login -----------------------------------------
+
+async function tryLogin(host, email, password) {
+  const dg = await fetchJson(`https://${host}/getdigest`);
+  if (dg.result !== 0 || !dg.digest) throw new Error('Could not start login');
+  const inner = await sha1hex(email.toLowerCase());
+  const passworddigest = await sha1hex(password + inner + dg.digest);
+  const qs = new URLSearchParams({
+    getauth: '1',
+    username: email.toLowerCase(),
+    digest: dg.digest,
+    passworddigest,
+  });
+  const info = await fetchJson(`https://${host}/userinfo?${qs}`);
+  if (info.result !== 0 || !info.auth) {
+    const err = new Error(info.error || `Login failed (${info.result})`);
+    err.result = info.result;
+    throw err;
+  }
+  return info.auth;
+}
+
+// Logs in and stores the token. Tries EU then US so the account region is
+// found automatically. Returns the host that worked.
+export async function loginWithPassword(email, password) {
+  let lastErr;
+  for (const host of LOGIN_HOSTS) {
+    try {
+      const token = await tryLogin(host, email, password);
+      setAuth({ token, host, param: 'auth' });
+      return { host };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Login failed');
+}
+
+// ---- OAuth2 implicit flow (optional, needs a client id) -------------------
+
 function redirectUri() {
   return window.location.origin + window.location.pathname;
 }
 
-// Kick off the OAuth flow by navigating away to pCloud's consent screen.
 export function connect() {
   if (!CLIENT_ID) throw new Error('pCloud client id is not configured');
   const params = new URLSearchParams({
@@ -59,9 +120,6 @@ export function connect() {
   window.location.href = `${AUTHORIZE_URL}?${params}`;
 }
 
-// On app load, capture the token pCloud appended to our URL (it may arrive in
-// the hash fragment or the query string depending on the flow), store it, and
-// scrub it from the address bar. Returns true if we just connected.
 export function handleRedirect() {
   const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const fromQuery = new URLSearchParams(window.location.search);
@@ -70,27 +128,19 @@ export function handleRedirect() {
   if (!token) return false;
 
   const host = HOSTS[Number(locationid)] || HOSTS[2];
-  setAuth({ access_token: token, host });
-  // Remove the token from the URL so a refresh/bookmark doesn't leak it.
+  setAuth({ token, host, param: 'access_token' });
   window.history.replaceState({}, '', redirectUri());
   return true;
 }
 
-function requireAuth() {
-  const auth = getAuth();
-  if (!auth?.access_token) throw new Error('Not connected to pCloud');
-  return auth;
-}
+// ---- REST API -------------------------------------------------------------
 
-// GET helper. pCloud returns JSON with a `result` field; non-zero means error.
 async function apiGet(method, params = {}) {
-  const { access_token, host } = requireAuth();
-  const qs = new URLSearchParams({ access_token, ...params });
-  const res = await fetch(`https://${host}/${method}?${qs}`);
-  if (!res.ok) throw new Error(`pCloud ${method} HTTP ${res.status}`);
-  const data = await res.json();
+  const { token, host, param } = requireAuth();
+  const qs = new URLSearchParams({ [param]: token, ...params });
+  const data = await fetchJson(`https://${host}/${method}?${qs}`);
   if (data.result !== 0) {
-    if (data.result === 2000 || data.result === 1000) disconnect(); // bad/expired token
+    if (data.result === 1000 || data.result === 2000 || data.result === 2094) disconnect();
     throw new Error(data.error || `pCloud ${method} error ${data.result}`);
   }
   return data;
@@ -109,8 +159,6 @@ async function ensureFolder() {
   await apiGet('createfolderifnotexists', { path: SONG_FOLDER });
 }
 
-// Returns lightweight list items: { id (path), title, savedAt }.
-// Artist/key/tempo live inside each file and load on demand in loadSong().
 export async function listSongs() {
   await ensureFolder();
   const data = await apiGet('listfolder', { path: SONG_FOLDER });
@@ -125,7 +173,6 @@ export async function listSongs() {
     .sort((a, b) => b.savedAt - a.savedAt);
 }
 
-// Resolves a file path to a temporary download URL, then fetches the content.
 export async function loadSong(path) {
   const link = await apiGet('getfilelink', { path });
   const host = link.hosts?.[0];
@@ -136,9 +183,6 @@ export async function loadSong(path) {
   return { ...song, id: path };
 }
 
-// Writes a song file, overwriting any existing file with the same title.
-// If the title changed (so the filename changed), the old file is removed so
-// renames don't leave an orphan. Returns the new song record.
 export async function saveSong({ id, metadata, text }) {
   await ensureFolder();
   const savedAt = Date.now();
@@ -146,15 +190,11 @@ export async function saveSong({ id, metadata, text }) {
   const newPath = `${SONG_FOLDER}/${filename}`;
   const payload = { id: newPath, metadata, text, savedAt };
 
-  const { access_token, host } = requireAuth();
+  const { token, host, param } = requireAuth();
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const form = new FormData();
   form.append(filename, blob, filename);
-  const qs = new URLSearchParams({
-    access_token,
-    path: SONG_FOLDER,
-    nopartial: '1',
-  });
+  const qs = new URLSearchParams({ [param]: token, path: SONG_FOLDER, nopartial: '1' });
   const res = await fetch(`https://${host}/uploadfile?${qs}`, { method: 'POST', body: form });
   if (!res.ok) throw new Error(`pCloud upload HTTP ${res.status}`);
   const data = await res.json();

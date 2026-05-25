@@ -3,11 +3,10 @@ import MetadataForm from './components/MetadataForm';
 import Editor from './components/Editor';
 import Preview from './components/Preview';
 import Toolbar from './components/Toolbar';
+import PCloudLogin from './components/PCloudLogin';
 import { loadCurrent, saveCurrent } from './utils/storage';
 import {
-  isCloudConfigured,
   isCloudConnected,
-  connectCloud,
   disconnectCloud,
   handleCloudRedirect,
   migrateLocalToPCloud,
@@ -25,6 +24,7 @@ export default function App() {
   const [savedAt, setSavedAt] = useState(null);
   const [fitToOnePage, setFitToOnePage] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
+  const [showCloudLogin, setShowCloudLogin] = useState(false);
   const hydrated = useRef(false);
 
   const parsedLines = useMemo(() => parseChordPro(text || ''), [text]);
@@ -51,6 +51,12 @@ export default function App() {
   function handleDisconnectCloud() {
     disconnectCloud();
     setCloudConnected(false);
+  }
+
+  function handleCloudLoginSuccess() {
+    setShowCloudLogin(false);
+    setCloudConnected(true);
+    migrateLocalToPCloud().catch(() => {});
   }
 
   // Auto-save the current editor state on every change.
@@ -106,9 +112,8 @@ export default function App() {
           onToggleFit={() => setFitToOnePage(v => !v)}
           fitInfo={fitInfo}
           activeScale={activeScale}
-          cloudConfigured={isCloudConfigured()}
           cloudConnected={cloudConnected}
-          onConnectCloud={connectCloud}
+          onConnectCloud={() => setShowCloudLogin(true)}
           onDisconnectCloud={handleDisconnectCloud}
         />
 
@@ -150,6 +155,13 @@ export default function App() {
           </div>
         </details>
       </main>
+
+      {showCloudLogin && (
+        <PCloudLogin
+          onClose={() => setShowCloudLogin(false)}
+          onSuccess={handleCloudLoginSuccess}
+        />
+      )}
     </div>
   );
 }

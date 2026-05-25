@@ -113,11 +113,21 @@ matches the actual style in `SongDocument.jsx`.** They drift easily.
 - **Not configured / not connected** → the original localStorage library in
   `utils/storage.js`. The app is fully functional with no pCloud at all.
 
-`isCloudConfigured()` is true only when `VITE_PCLOUD_CLIENT_ID` is set. Auth is
-the OAuth2 implicit (`response_type=token`) flow: `connect()` redirects the
-whole page to pCloud; `handleRedirect()` (called once on App mount) reads the
-`access_token` + `locationid` back off the URL, stores them, and scrubs the
-URL. `locationid` 1 = US (`api.pcloud.com`), 2 = EU (`eapi.pcloud.com`).
+Auth has two paths, both ending in a stored `{ token, host, param }` where
+`param` is the query key to authenticate with (`auth` for login, `access_token`
+for OAuth):
+
+- **Direct login (default)** — `loginWithPassword(email, password)`. pCloud
+  digest auth: `getdigest` → `passworddigest = sha1(password + sha1(lower(email))
+  + digest)` → `userinfo?getauth=1` returns the token. The raw password never
+  leaves the browser; `crypto.subtle` does the SHA-1. Tries EU host then US so
+  the account region is found automatically. No client id needed. UI is the
+  `PCloudLogin` modal.
+- **OAuth2 implicit (optional, needs `VITE_PCLOUD_CLIENT_ID`)** — `connect()`
+  redirects to pCloud; `handleRedirect()` (called once on App mount) reads the
+  `access_token` + `locationid` off the URL and scrubs it. Kept for the future;
+  pCloud's app-registration page is frequently broken, which is why direct
+  login is the primary path. `locationid` 1 = US, 2 = EU.
 
 A song's `id` in cloud mode **is its pCloud path** (`/ChordSheet/<title>.json`).
 Renaming the title writes a new file and deletes the old one. The library list

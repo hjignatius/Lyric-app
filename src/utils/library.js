@@ -17,10 +17,12 @@ import {
 
 const CACHE_KEY = 'chordsheet:pcloud-cache';
 
-export const isCloudConfigured = pcloud.isConfigured;
 export const isCloudConnected = pcloud.isConnected;
-export const connectCloud = pcloud.connect;
+export const loginCloud = pcloud.loginWithPassword;
 export const handleCloudRedirect = pcloud.handleRedirect;
+// OAuth path — kept for the future if pCloud's app registration starts working.
+export const isOAuthConfigured = pcloud.isOAuthConfigured;
+export const connectCloudOAuth = pcloud.connect;
 
 export function disconnectCloud() {
   pcloud.disconnect();

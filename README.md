@@ -99,32 +99,36 @@ library on your Mac, iPad, and phone, connect a pCloud account. The app stays
 100% static — it talks to pCloud directly from the browser, so there's still
 no backend to run.
 
-**1. Register a pCloud app** at <https://docs.pcloud.com/my_apps/> to get a
-**client id** (app key). Add these redirect URIs to the app:
-
-- `http://localhost:5173/` (local dev)
-- your deployed URL, e.g. `https://your-app.vercel.app/`
-
-**2. Set the client id.** Locally, copy `.env.example` → `.env.local` and fill
-in `VITE_PCLOUD_CLIENT_ID`. On Vercel, add the same as an environment variable.
-
-**3. Deploy to Vercel.** Import the GitHub repo at <https://vercel.com/new>.
+**1. Deploy to Vercel.** Import the GitHub repo at <https://vercel.com/new>.
 Vercel auto-detects Vite; the included `vercel.json` handles SPA routing. It
-redeploys on every push.
+redeploys on every push. No environment variables are required.
 
-**4. Connect.** Open the app, click **Connect pCloud**, approve access. Your
-songs now save to a `/ChordSheet` folder in pCloud and appear on any device
-where you connect. EU and US accounts both work — the region is detected at
-login.
+**2. Connect.** Open the app, click **Connect pCloud**, and sign in with your
+pCloud email and password. Your songs now save to a `/ChordSheet` folder in
+pCloud and appear on any device where you connect. EU and US accounts both
+work — the region is detected automatically.
+
+How sign-in works: the app uses pCloud's digest authentication. Your password
+is hashed against a one-time server challenge and **never sent in clear or
+stored** — only the token pCloud returns is kept (in `localStorage`). There's
+no account or app registration to set up.
 
 Notes:
 
 - Songs are cached locally, so a synced device can still browse and open them
   offline.
 - EU privacy: EU accounts talk only to `eapi.pcloud.com`.
+- Two-factor pCloud accounts aren't supported by the login form yet.
 - If pCloud's file-download hosts ever block browser fetches with CORS, song
   *loading* would need a small Vercel serverless proxy (saving/listing are
   unaffected). Not needed in the common case — flagged here as a fallback.
+
+### OAuth instead of password (optional)
+
+If you'd rather not type your password — and pCloud's app registration is
+working for you — register an app at <https://docs.pcloud.com/my_apps/>, set
+`VITE_PCLOUD_CLIENT_ID` (locally in `.env.local`, on Vercel as an env var), and
+add your URLs as redirect URIs. The OAuth code path is still in `pcloud.js`.
 
 ## Tech stack
 
