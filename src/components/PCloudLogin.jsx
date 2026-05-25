@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { loginCloud, loginCloud2FA } from '../utils/library';
+import { loginCloud, loginCloud2FA, probe2FA } from '../utils/library';
 
 export default function PCloudLogin({ onClose, onSuccess }) {
   const [email, setEmail] = useState('');
@@ -9,6 +9,19 @@ export default function PCloudLogin({ onClose, onSuccess }) {
   const tfa = useRef({ host: null, tfatoken: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  async function runProbe() {
+    if (!email.trim() || !password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await probe2FA(email.trim(), password);
+      setError('DIAG ' + JSON.stringify(out));
+    } catch (err) {
+      setError('DIAG error: ' + (err?.message || 'unknown'));
+    }
+    setBusy(false);
+  }
 
   async function submitCredentials(e) {
     e.preventDefault();
@@ -100,7 +113,16 @@ export default function PCloudLogin({ onClose, onSuccess }) {
                 />
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-xs text-red-500 break-all select-all whitespace-pre-wrap">{error}</p>}
+
+              <button
+                type="button"
+                onClick={runProbe}
+                disabled={busy || !email.trim() || !password}
+                className="text-[11px] text-gray-400 underline disabled:opacity-50"
+              >
+                Run diagnostic
+              </button>
 
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button

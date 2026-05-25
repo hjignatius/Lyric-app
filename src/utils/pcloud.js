@@ -66,6 +66,39 @@ async function fetchJson(url, opts) {
   return res.json();
 }
 
+// ---- TEMPORARY diagnostic probe -------------------------------------------
+// Tries every method/auth combination so we can see which one returns the 2FA
+// token. Reports result codes + reply keys only — never the auth/token values.
+// Remove once the correct 2FA flow is confirmed.
+export async function probe2FA(email, password) {
+  const host = 'eapi.pcloud.com';
+  const user = email.toLowerCase();
+  const inner = await sha1hex(user);
+  const out = {};
+  async function digestQS() {
+    const dg = await fetchJson(`https://${host}/getdigest`);
+    const pd = await sha1hex(password + inner + dg.digest);
+    return `username=${encodeURIComponent(user)}&digest=${dg.digest}&passworddigest=${pd}`;
+  }
+  const plainQS = `username=${encodeURIComponent(user)}&password=${encodeURIComponent(password)}`;
+  const summarize = r => ({ result: r.result, error: r.error, token: !!r.token, keys: Object.keys(r) });
+  const attempts = [
+    ['userinfo_digest', async () => `userinfo?getauth=1&${await digestQS()}`],
+    ['login_digest',    async () => `login?getauth=1&${await digestQS()}`],
+    ['login_plain',     async () => `login?getauth=1&${plainQS}`],
+    ['userinfo_plain',  async () => `userinfo?getauth=1&${plainQS}`],
+  ];
+  for (const [name, build] of attempts) {
+    try {
+      const r = await fetchJson(`https://${host}/${await build()}`);
+      out[name] = summarize(r);
+    } catch (e) {
+      out[name] = { error: e.message };
+    }
+  }
+  return out;
+}
+
 // ---- Direct email/password login -----------------------------------------
 
 // One login attempt against the `login` method (the official client uses this,
