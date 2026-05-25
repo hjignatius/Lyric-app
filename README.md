@@ -118,7 +118,10 @@ Notes:
 - Songs are cached locally, so a synced device can still browse and open them
   offline.
 - EU privacy: EU accounts talk only to `eapi.pcloud.com`.
-- Two-factor pCloud accounts aren't supported by the login form yet.
+- Two-factor accounts are supported: after your password, the form asks for
+  the 6-digit code from your authenticator app. (pCloud's HTTP API only
+  accepts a 2FA code together with a plaintext password, so that one request
+  sends the password over HTTPS rather than the usual hashed digest.)
 - If pCloud's file-download hosts ever block browser fetches with CORS, song
   *loading* would need a small Vercel serverless proxy (saving/listing are
   unaffected). Not needed in the common case — flagged here as a fallback.

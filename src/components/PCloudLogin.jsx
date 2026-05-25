@@ -1,27 +1,14 @@
 import { useRef, useState } from 'react';
-import { loginCloud, loginCloud2FA, probe2FA } from '../utils/library';
+import { loginCloud, loginCloud2FA } from '../utils/library';
 
 export default function PCloudLogin({ onClose, onSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [step, setStep] = useState('credentials'); // 'credentials' | 'totp'
-  const tfa = useRef({ host: null, tfatoken: null });
+  const tfaHost = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-
-  async function runProbe() {
-    if (!email.trim() || !password) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const out = await probe2FA(email.trim(), password);
-      setError('DIAG ' + JSON.stringify(out));
-    } catch (err) {
-      setError('DIAG error: ' + (err?.message || 'unknown'));
-    }
-    setBusy(false);
-  }
 
   async function submitCredentials(e) {
     e.preventDefault();
@@ -33,12 +20,11 @@ export default function PCloudLogin({ onClose, onSuccess }) {
       onSuccess();
     } catch (err) {
       if (err?.needs2FA) {
-        tfa.current = { host: err.host, tfatoken: err.tfatoken, raw: err.raw };
+        tfaHost.current = err.host;
         setStep('totp');
         setBusy(false);
       } else {
-        const c = err?.result != null ? `pCloud ${err.result}: ` : '';
-        setError(`Login failed — ${c}${err?.message || 'check your email and password.'}`);
+        setError('Login failed. Check your email and password.');
         setBusy(false);
       }
     }
@@ -48,18 +34,14 @@ export default function PCloudLogin({ onClose, onSuccess }) {
     e.preventDefault();
     const code = totpCode.replace(/\s/g, '');
     if (!code) return;
-    if (!tfa.current.tfatoken) {
-      setError('Login session expired. Go back and sign in again.');
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
-      await loginCloud2FA(tfa.current.host, email.trim(), password, tfa.current.tfatoken, code);
+      await loginCloud2FA(tfaHost.current, email.trim(), password, code);
       onSuccess();
     } catch (err) {
-      // 2064/2294 = bad code; otherwise surface the exact pCloud result.
-      if (err?.result === 2064 || err?.result === 2294) {
+      // 1022/2012/2294 = bad or missing code; otherwise show the real result.
+      if ([1022, 2012, 2064, 2294].includes(err?.result)) {
         setError('Incorrect code — check your authenticator app and try again.');
       } else {
         const c = err?.result != null ? `pCloud ${err.result}: ` : '';
@@ -113,16 +95,7 @@ export default function PCloudLogin({ onClose, onSuccess }) {
                 />
               </div>
 
-              {error && <p className="text-xs text-red-500 break-all select-all whitespace-pre-wrap">{error}</p>}
-
-              <button
-                type="button"
-                onClick={runProbe}
-                disabled={busy || !email.trim() || !password}
-                className="text-[11px] text-gray-400 underline disabled:opacity-50"
-              >
-                Run diagnostic
-              </button>
+              {error && <p className="text-sm text-red-500">{error}</p>}
 
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
@@ -144,9 +117,9 @@ export default function PCloudLogin({ onClose, onSuccess }) {
             </form>
 
             <p className="text-[11px] text-gray-400 mt-4 leading-relaxed">
-              Your password is hashed and sent only to pCloud — never stored. We keep
-              only the access token pCloud returns. EU and US accounts are detected
-              automatically.
+              Your password is hashed before being sent to pCloud and is never
+              stored — we keep only the access token pCloud returns. EU and US
+              accounts are detected automatically.
             </p>
           </>
         ) : (
