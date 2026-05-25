@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { loginCloud, loginCloud2FA } from '../utils/library';
+import { loginCloud, loginCloud2FA, probeComplete2FA } from '../utils/library';
 
 export default function PCloudLogin({ onClose, onSuccess }) {
   const [email, setEmail] = useState('');
@@ -52,6 +52,20 @@ export default function PCloudLogin({ onClose, onSuccess }) {
       }
       setBusy(false);
     }
+  }
+
+  async function runProbe() {
+    const code = totpCode.replace(/\s/g, '');
+    if (!code) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await probeComplete2FA(email.trim(), password, code);
+      setError('DIAG ' + JSON.stringify(out));
+    } catch (err) {
+      setError('DIAG error: ' + (err?.message || 'unknown'));
+    }
+    setBusy(false);
   }
 
   return (
@@ -147,7 +161,16 @@ export default function PCloudLogin({ onClose, onSuccess }) {
                 />
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-xs text-red-500 break-all select-all whitespace-pre-wrap">{error}</p>}
+
+              <button
+                type="button"
+                onClick={runProbe}
+                disabled={busy || !totpCode.replace(/\s/g, '')}
+                className="text-[11px] text-gray-400 underline disabled:opacity-50"
+              >
+                Run diagnostic
+              </button>
 
               <div className="flex items-center justify-between gap-2 pt-1">
                 <button
