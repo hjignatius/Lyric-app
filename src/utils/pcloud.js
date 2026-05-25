@@ -69,6 +69,37 @@ async function fetchJson(url, opts) {
   return res.json();
 }
 
+// ---- TEMPORARY diagnostic probe -------------------------------------------
+// Confirms what the `login` method needs (a deviceid?) and whether it returns
+// the 2FA `token` on 2297. Reports result codes / error text / reply keys
+// only — never auth or token values. To be removed once the flow is fixed.
+export async function probe2FA(email, password) {
+  const host = 'eapi.pcloud.com';
+  const user = email.toLowerCase();
+  const inner = await sha1hex(user);
+  const did = 'chordsheet-web-probe';
+  const out = {};
+  async function digestQS() {
+    const dg = await fetchJson(`https://${host}/getdigest`);
+    const pd = await sha1hex(password + inner + dg.digest);
+    return `username=${encodeURIComponent(user)}&digest=${dg.digest}&passworddigest=${pd}`;
+  }
+  const summarize = r => ({ result: r.result, error: r.error, token: !!r.token, keys: Object.keys(r) });
+  const attempts = [
+    ['login_did',      async () => `login?getauth=1&${await digestQS()}&deviceid=${did}`],
+    ['login_did_full', async () => `login?getauth=1&${await digestQS()}&deviceid=${did}&device=web&os=4&osversion=1&appversion=1`],
+  ];
+  for (const [name, build] of attempts) {
+    try {
+      const r = await fetchJson(`https://${host}/${await build()}`);
+      out[name] = summarize(r);
+    } catch (e) {
+      out[name] = { error: e.message };
+    }
+  }
+  return out;
+}
+
 // ---- Direct email/password login -----------------------------------------
 
 // Initial credential check via digest auth, so the raw password isn't sent
