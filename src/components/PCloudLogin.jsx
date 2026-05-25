@@ -35,18 +35,22 @@ export default function PCloudLogin({ onClose, onSuccess }) {
     const code = totpCode.replace(/\s/g, '');
     if (!code) return;
     if (!tfa.current.tfatoken) {
-      setError('No tfatoken. pCloud 2297 response was: ' + JSON.stringify(tfa.current.raw));
+      setError('Login session expired. Go back and sign in again.');
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await loginCloud2FA(tfa.current.host, tfa.current.tfatoken, code);
+      await loginCloud2FA(tfa.current.host, email.trim(), password, tfa.current.tfatoken, code);
       onSuccess();
     } catch (err) {
-      // Surface the exact pCloud response so failures can be diagnosed precisely.
-      const code = err?.result != null ? `pCloud ${err.result}: ` : '';
-      setError(`Verification failed — ${code}${err?.message || 'unknown error'}`);
+      // 2064/2294 = bad code; otherwise surface the exact pCloud result.
+      if (err?.result === 2064 || err?.result === 2294) {
+        setError('Incorrect code — check your authenticator app and try again.');
+      } else {
+        const c = err?.result != null ? `pCloud ${err.result}: ` : '';
+        setError(`Verification failed — ${c}${err?.message || 'unknown error'}`);
+      }
       setBusy(false);
     }
   }

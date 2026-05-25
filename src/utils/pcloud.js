@@ -68,7 +68,11 @@ async function fetchJson(url, opts) {
 
 // ---- Direct email/password login -----------------------------------------
 
-async function tryLogin(host, email, password) {
+// One login attempt against the `login` method (the official client uses this,
+// not `userinfo` — only `login` returns the 2FA `token` on result 2297). A
+// fresh digest is fetched each call since the digest is single-use. `extra`
+// carries the 2FA params (token, code, trustdevice) on the completion call.
+async function loginRequest(host, email, password, extra = {}) {
   const dg = await fetchJson(`https://${host}/getdigest`);
   if (dg.result !== 0 || !dg.digest) throw new Error('Could not start login');
   const inner = await sha1hex(email.toLowerCase());
@@ -78,16 +82,21 @@ async function tryLogin(host, email, password) {
     username: email.toLowerCase(),
     digest: dg.digest,
     passworddigest,
+    ...extra,
   });
-  const info = await fetchJson(`https://${host}/userinfo?${qs}`);
+  return fetchJson(`https://${host}/login?${qs}`);
+}
+
+async function tryLogin(host, email, password) {
+  const info = await loginRequest(host, email, password);
   // 2297 = credentials accepted, but the account has 2FA on. pCloud returns a
-  // one-time tfatoken; the code is completed via tfa_login (NOT userinfo).
+  // one-time token in the `token` field; the code is completed via login again.
   if (info.result === 2297) {
     const err = new Error('Two-factor authentication required');
     err.result = 2297;
     err.needs2FA = true;
-    err.tfatoken = info.tfatoken;
-    err.raw = info; // full response so we can see which field carries the token
+    err.tfatoken = info.token;
+    err.raw = info;
     throw err;
   }
   if (info.result !== 0 || !info.auth) {
@@ -120,13 +129,13 @@ export async function loginWithPassword(email, password) {
   throw lastErr || new Error('Login failed');
 }
 
-// Completes a 2FA login. host + tfatoken come from the needs2FA error thrown
-// by loginWithPassword; code is the verification code from the user's app.
-// trustdevice tells pCloud to skip 2FA on later logins from this device.
-export async function loginWithPassword2FA(host, tfatoken, code, trustDevice = true) {
-  const params = { tfatoken, code, getauth: '1' };
-  if (trustDevice) params.trustdevice = '1';
-  const info = await fetchJson(`https://${host}/tfa_login?${new URLSearchParams(params)}`);
+// Completes a 2FA login. host/email/password identify the account (a fresh
+// digest is computed); tfatoken is the `token` from the needs2FA error and
+// code is the verification code. trustdevice skips 2FA on later logins.
+export async function loginWithPassword2FA(host, email, password, tfatoken, code, trustDevice = true) {
+  const extra = { token: tfatoken, code };
+  if (trustDevice) extra.trustdevice = '1';
+  const info = await loginRequest(host, email, password, extra);
   if (info.result !== 0 || !info.auth) {
     const err = new Error(info.error || `2FA failed (${info.result})`);
     err.result = info.result;
