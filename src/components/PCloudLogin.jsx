@@ -20,7 +20,7 @@ export default function PCloudLogin({ onClose, onSuccess }) {
       onSuccess();
     } catch (err) {
       if (err?.needs2FA) {
-        tfa.current = { host: err.host, tfatoken: err.tfatoken };
+        tfa.current = { host: err.host, tfatoken: err.tfatoken, raw: err.raw };
         setStep('totp');
         setBusy(false);
       } else {
@@ -35,7 +35,7 @@ export default function PCloudLogin({ onClose, onSuccess }) {
     const code = totpCode.replace(/\s/g, '');
     if (!code) return;
     if (!tfa.current.tfatoken) {
-      setError('Login session expired (no 2FA token). Go back and sign in again.');
+      setError('No tfatoken. pCloud 2297 response was: ' + JSON.stringify(tfa.current.raw));
       return;
     }
     setBusy(true);

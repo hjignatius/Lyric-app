@@ -87,6 +87,7 @@ async function tryLogin(host, email, password) {
     err.result = 2297;
     err.needs2FA = true;
     err.tfatoken = info.tfatoken;
+    err.raw = info; // full response so we can see which field carries the token
     throw err;
   }
   if (info.result !== 0 || !info.auth) {
