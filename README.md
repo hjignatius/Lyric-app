@@ -21,6 +21,10 @@ browser automatically.
 - **Autosave** to `localStorage` — never lose work on reload
 - **Song library** — save multiple songs, load them back, delete the ones
   you don't need
+- **Cross-device sync** (optional) — connect a pCloud account and your songs
+  live as `.json` files in a `/ChordSheet` folder, available on every device.
+  Works offline from a local cache once synced. No pCloud? It falls back to
+  per-browser `localStorage` automatically.
 - **PDF export** via `@react-pdf/renderer` — formatted A4 chord sheet,
   printable and shareable
 
@@ -88,12 +92,48 @@ Chorus    [F]She's a sensitive [C]kind
 The section labels (`Verse 1`, `Chorus`) sit in the left margin so they
 take zero vertical space — handy for fitting longer songs on one page.
 
+## Sync across devices (pCloud + Vercel)
+
+By default songs live in the browser they were created in. To use the same
+library on your Mac, iPad, and phone, connect a pCloud account. The app stays
+100% static — it talks to pCloud directly from the browser, so there's still
+no backend to run.
+
+**1. Register a pCloud app** at <https://docs.pcloud.com/my_apps/> to get a
+**client id** (app key). Add these redirect URIs to the app:
+
+- `http://localhost:5173/` (local dev)
+- your deployed URL, e.g. `https://your-app.vercel.app/`
+
+**2. Set the client id.** Locally, copy `.env.example` → `.env.local` and fill
+in `VITE_PCLOUD_CLIENT_ID`. On Vercel, add the same as an environment variable.
+
+**3. Deploy to Vercel.** Import the GitHub repo at <https://vercel.com/new>.
+Vercel auto-detects Vite; the included `vercel.json` handles SPA routing. It
+redeploys on every push.
+
+**4. Connect.** Open the app, click **Connect pCloud**, approve access. Your
+songs now save to a `/ChordSheet` folder in pCloud and appear on any device
+where you connect. EU and US accounts both work — the region is detected at
+login.
+
+Notes:
+
+- Songs are cached locally, so a synced device can still browse and open them
+  offline.
+- EU privacy: EU accounts talk only to `eapi.pcloud.com`.
+- If pCloud's file-download hosts ever block browser fetches with CORS, song
+  *loading* would need a small Vercel serverless proxy (saving/listing are
+  unaffected). Not needed in the common case — flagged here as a fallback.
+
 ## Tech stack
 
 - React 19 + Vite 8
 - Tailwind CSS v4
 - `@react-pdf/renderer` for PDF export
-- `localStorage` for persistence (no backend)
+- `localStorage` for persistence + offline cache
+- pCloud REST API (optional) for cross-device sync — no backend
+- Vercel for static hosting (optional)
 
 ## Contributing
 

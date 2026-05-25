@@ -4,6 +4,13 @@ import Editor from './components/Editor';
 import Preview from './components/Preview';
 import Toolbar from './components/Toolbar';
 import { loadCurrent, saveCurrent } from './utils/storage';
+import {
+  isCloudConfigured,
+  isCloudConnected,
+  connectCloud,
+  disconnectCloud,
+  handleCloudRedirect,
+} from './utils/library';
 import { parseChordPro } from './utils/chordPro';
 import { computeFitScale } from './utils/pageBreaks';
 import './index.css';
@@ -16,14 +23,17 @@ export default function App() {
   const [currentId, setCurrentId] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
   const [fitToOnePage, setFitToOnePage] = useState(false);
+  const [cloudConnected, setCloudConnected] = useState(false);
   const hydrated = useRef(false);
 
   const parsedLines = useMemo(() => parseChordPro(text || ''), [text]);
   const fitInfo = useMemo(() => computeFitScale(parsedLines, metadata), [parsedLines, metadata]);
   const activeScale = fitToOnePage ? fitInfo.scale : 1;
 
-  // Restore the in-progress draft on first load.
+  // Capture a returning pCloud OAuth token (if any), then restore the draft.
   useEffect(() => {
+    handleCloudRedirect();
+    setCloudConnected(isCloudConnected());
     const draft = loadCurrent();
     if (draft) {
       setText(draft.text || '');
@@ -32,6 +42,11 @@ export default function App() {
     }
     hydrated.current = true;
   }, []);
+
+  function handleDisconnectCloud() {
+    disconnectCloud();
+    setCloudConnected(false);
+  }
 
   // Auto-save the current editor state on every change.
   useEffect(() => {
@@ -86,6 +101,10 @@ export default function App() {
           onToggleFit={() => setFitToOnePage(v => !v)}
           fitInfo={fitInfo}
           activeScale={activeScale}
+          cloudConfigured={isCloudConfigured()}
+          cloudConnected={cloudConnected}
+          onConnectCloud={connectCloud}
+          onDisconnectCloud={handleDisconnectCloud}
         />
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ minHeight: '420px' }}>

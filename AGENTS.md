@@ -44,7 +44,9 @@ src/
     ├── pageBreaks.js            estimate where PDF pages break, compute fit scale
     ├── pdfExport.js             trigger blob download
     ├── SongDocument.jsx         @react-pdf document tree
-    └── storage.js               localStorage helpers
+    ├── storage.js               localStorage helpers (draft + local library)
+    ├── pcloud.js                pCloud OAuth + REST client (optional sync)
+    └── library.js               song-library facade: pCloud OR localStorage
 ```
 
 ## The single most important invariant
@@ -99,11 +101,39 @@ Plain lyric            line without brackets renders as lyric-only
 **Whenever you tune a height constant in `pageBreaks.js`, double-check it
 matches the actual style in `SongDocument.jsx`.** They drift easily.
 
+## Song storage: two modes behind one facade
+
+`components/SongLibrary.jsx` never touches storage directly — it calls
+`utils/library.js`, which picks the backend at runtime:
+
+- **pCloud connected** → songs are individual `.json` files in a `/ChordSheet`
+  folder (`utils/pcloud.js`). This is the source of truth; results are mirrored
+  into a localStorage cache so a synced device can read songs offline. Every
+  read (`listSongs`, `loadSong`) falls back to that cache on network failure.
+- **Not configured / not connected** → the original localStorage library in
+  `utils/storage.js`. The app is fully functional with no pCloud at all.
+
+`isCloudConfigured()` is true only when `VITE_PCLOUD_CLIENT_ID` is set. Auth is
+the OAuth2 implicit (`response_type=token`) flow: `connect()` redirects the
+whole page to pCloud; `handleRedirect()` (called once on App mount) reads the
+`access_token` + `locationid` back off the URL, stores them, and scrubs the
+URL. `locationid` 1 = US (`api.pcloud.com`), 2 = EU (`eapi.pcloud.com`).
+
+A song's `id` in cloud mode **is its pCloud path** (`/ChordSheet/<title>.json`).
+Renaming the title writes a new file and deletes the old one. The library list
+is cheap (filenames + modified dates from `listfolder`); full content
+(artist/key/tempo) loads on demand in `loadSong()` via `getfilelink` + fetch.
+
+**The Preview/PDF invariant does not involve storage** — `library.js` only
+moves song records around; it never changes how a parsed song renders.
+
 ## Persistence keys (localStorage)
 
 ```
-chordsheet:current   → { text, metadata, currentId }   active draft, autosaved every change
-chordsheet:library   → [{ id, metadata, text, savedAt }, ...]   named songs
+chordsheet:current       → { text, metadata, currentId }   active draft, autosaved every change
+chordsheet:library       → [{ id, metadata, text, savedAt }, ...]   local-mode named songs
+chordsheet:pcloud-auth   → { access_token, host }          pCloud token + region host
+chordsheet:pcloud-cache  → { list: [...], songs: {...} }   offline mirror of pCloud songs
 ```
 
 Autosave is keyed off any change in `text`, `metadata`, or `currentId` —
@@ -124,14 +154,24 @@ see the `useEffect` in `App.jsx`. Hydration on mount runs once via the
   actual paginator within a few points; if a break consistently lands
   on the wrong side of the actual PDF break, the heights in
   `pageBreaks.js` need re-tuning.
+- **pCloud redirect URIs must be registered verbatim.** The OAuth flow uses
+  `window.location.origin + pathname` as the redirect; add both the localhost
+  dev URL and the Vercel URL in the pCloud app settings or auth fails.
+- **pCloud file *downloads* may hit CORS.** `getfilelink` returns a content
+  host we fetch directly; if those hosts ever omit CORS headers, song loading
+  breaks (listing/saving don't). Fallback is a tiny Vercel serverless proxy.
+  Not implemented — `library.js` falls back to the offline cache meanwhile.
+- **The pCloud token lives in `localStorage`.** Normal for a public SPA OAuth
+  client; it's scrubbed from the URL on redirect so refresh/bookmark can't leak
+  it.
 
 ## What this app intentionally does NOT do
 
-- No backend, no accounts, no cross-device sync — songs are per-browser.
 - No chord diagrams / fretboard visualisation.
 - No audio playback, no metronome (the tap-tempo button just fills the BPM field).
 - No multi-page layout controls beyond shrink-to-fit one page.
-- No setlist or multi-song export.
+- No setlist or multi-song export (yet — cross-device sync via pCloud is the
+  groundwork for setlists + a performance mode).
 
 Add any of these only with a clear user request — none of them are
 implied by the current UX.

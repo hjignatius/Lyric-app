@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadLibrary, saveSongToLibrary, deleteSongFromLibrary } from '../utils/storage';
+import { listSongs, loadSong, saveSong, deleteSong } from '../utils/library';
 
 function formatRelative(ts) {
   const seconds = Math.floor((Date.now() - ts) / 1000);
@@ -16,15 +16,31 @@ export default function SongLibrary({
   onLoad,
   onSavedId,
   onNew,
+  cloudConnected,
 }) {
   const [open, setOpen] = useState(false);
   const [songs, setSongs] = useState([]);
   const [flash, setFlash] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [busyId, setBusyId] = useState(null);
   const ref = useRef(null);
 
+  async function refresh() {
+    setLoading(true);
+    setError(null);
+    try {
+      setSongs(await listSongs());
+    } catch {
+      setError('Could not load songs');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    if (open) setSongs(loadLibrary());
-  }, [open]);
+    if (open) refresh();
+  }, [open, cloudConnected]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -36,26 +52,43 @@ export default function SongLibrary({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  function handleSave() {
+  async function handleSave() {
     if (!text?.trim()) return;
-    const id = saveSongToLibrary({ id: currentId, metadata, text });
-    onSavedId?.(id);
-    setSongs(loadLibrary());
-    setFlash(currentId ? 'Updated' : 'Saved');
+    setFlash('Saving…');
+    try {
+      const id = await saveSong({ id: currentId, metadata, text });
+      onSavedId?.(id);
+      setFlash(currentId ? 'Updated' : 'Saved');
+      if (open) refresh();
+    } catch {
+      setFlash('Save failed');
+    }
     setTimeout(() => setFlash(null), 1500);
   }
 
-  function handleLoad(song) {
-    onLoad(song);
-    setOpen(false);
+  async function handleLoad(item) {
+    setBusyId(item.id);
+    try {
+      const song = await loadSong(item);
+      onLoad(song);
+      setOpen(false);
+    } catch {
+      setError('Could not open this song');
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function handleDelete(e, id) {
+  async function handleDelete(e, id) {
     e.stopPropagation();
     if (!confirm('Delete this song?')) return;
-    deleteSongFromLibrary(id);
-    setSongs(loadLibrary());
-    if (id === currentId) onSavedId?.(null);
+    try {
+      await deleteSong(id);
+      if (id === currentId) onSavedId?.(null);
+      refresh();
+    } catch {
+      setError('Could not delete this song');
+    }
   }
 
   const saveLabel = currentId ? 'Update' : 'Save';
@@ -89,7 +122,9 @@ export default function SongLibrary({
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 max-h-96 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">My Songs</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {cloudConnected ? 'My Songs · pCloud' : 'My Songs'}
+            </span>
             <button
               onClick={() => { onNew(); setOpen(false); }}
               className="text-xs text-violet-600 hover:text-violet-800 font-medium"
@@ -98,21 +133,30 @@ export default function SongLibrary({
             </button>
           </div>
           <div className="overflow-y-auto flex-1">
-            {songs.length === 0 ? (
+            {loading ? (
+              <p className="p-4 text-sm text-gray-400 italic text-center">Loading…</p>
+            ) : error ? (
+              <div className="p-4 text-center">
+                <p className="text-sm text-red-500">{error}</p>
+                <button onClick={refresh} className="mt-2 text-xs text-violet-600 hover:text-violet-800 font-medium">
+                  Retry
+                </button>
+              </div>
+            ) : songs.length === 0 ? (
               <p className="p-4 text-sm text-gray-400 italic text-center">
                 No saved songs yet. Click <strong>Save</strong> to add one.
               </p>
             ) : (
               <ul>
                 {songs.map(song => {
-                  const title = song.metadata?.title?.trim() || 'Untitled';
-                  const artist = song.metadata?.artist?.trim();
+                  const title = song.title?.trim() || 'Untitled';
+                  const artist = song.artist?.trim();
                   const isCurrent = song.id === currentId;
                   return (
                     <li
                       key={song.id}
                       onClick={() => handleLoad(song)}
-                      className={`group flex items-start gap-2 px-3 py-2 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-violet-50 ${isCurrent ? 'bg-violet-50/60' : ''}`}
+                      className={`group flex items-start gap-2 px-3 py-2 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-violet-50 ${isCurrent ? 'bg-violet-50/60' : ''} ${busyId === song.id ? 'opacity-50' : ''}`}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
