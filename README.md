@@ -119,9 +119,9 @@ Notes:
   offline.
 - EU privacy: EU accounts talk only to `eapi.pcloud.com`.
 - Two-factor accounts are supported: after your password, the form asks for
-  the 6-digit code from your authenticator app. (pCloud's HTTP API only
-  accepts a 2FA code together with a plaintext password, so that one request
-  sends the password over HTTPS rather than the usual hashed digest.)
+  the 6-digit code from your authenticator app. The device is then marked
+  trusted, so pCloud won't prompt for a code on it again until that trust
+  expires.
 - If pCloud's file-download hosts ever block browser fetches with CORS, song
   *loading* would need a small Vercel serverless proxy (saving/listing are
   unaffected). Not needed in the common case — flagged here as a fallback.

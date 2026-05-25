@@ -2,13 +2,13 @@
 //
 // Two ways to authenticate, both yielding a token we store and reuse:
 //
-//   1. Direct login (default): email + password. The first attempt uses
-//      digest auth — pCloud issues a one-time `digest` and we send
-//      sha1(password + sha1(lower(email)) + digest), so the raw password
-//      stays in the browser. Only the returned token is stored. No
-//      app/client-id registration needed. (2FA accounts are the exception:
-//      pCloud's HTTP API only takes the verification code with a plaintext
-//      password, so the 2FA completion step sends the password over HTTPS.)
+//   1. Direct login (default): email + password via the `login` method. We
+//      never send the raw password — pCloud issues a one-time `digest` and we
+//      send sha1(password + sha1(lower(email)) + digest). `login` also needs a
+//      deviceid + os. 2FA accounts reply 2297 with a one-time `token`; the
+//      verification code is sent on a second `login` call with that token (and
+//      trustdevice=1, so the device is remembered). Only the returned auth
+//      token is stored. No app/client-id registration needed.
 //   2. OAuth2 implicit flow (kept for the future, needs VITE_PCLOUD_CLIENT_ID):
 //      redirect to pCloud, come back with an access_token in the URL.
 //
@@ -69,45 +69,25 @@ async function fetchJson(url, opts) {
   return res.json();
 }
 
-// ---- TEMPORARY diagnostic probe -------------------------------------------
-// Confirms what the `login` method needs (a deviceid?) and whether it returns
-// the 2FA `token` on 2297. Reports result codes / error text / reply keys
-// only — never auth or token values. To be removed once the flow is fixed.
-export async function probe2FA(email, password) {
-  const host = 'eapi.pcloud.com';
-  const user = email.toLowerCase();
-  const inner = await sha1hex(user);
-  const did = 'chordsheet-web-probe';
-  const out = {};
-  async function digestQS() {
-    const dg = await fetchJson(`https://${host}/getdigest`);
-    const pd = await sha1hex(password + inner + dg.digest);
-    return `username=${encodeURIComponent(user)}&digest=${dg.digest}&passworddigest=${pd}`;
-  }
-  const summarize = r => ({ result: r.result, error: r.error, token: !!r.token, keys: Object.keys(r) });
-  const attempts = [
-    ['login_did',      async () => `login?getauth=1&${await digestQS()}&deviceid=${did}`],
-    ['login_did_full', async () => `login?getauth=1&${await digestQS()}&deviceid=${did}&device=web&os=4&osversion=1&appversion=1`],
-  ];
-  for (const [name, build] of attempts) {
-    try {
-      const r = await fetchJson(`https://${host}/${await build()}`);
-      out[name] = summarize(r);
-    } catch (e) {
-      out[name] = { error: e.message };
-    }
-  }
-  return out;
-}
-
 // ---- Direct email/password login -----------------------------------------
 
-// Initial credential check via digest auth, so the raw password isn't sent
-// for ordinary (non-2FA) accounts. Returns the auth token on success. On a
-// 2FA account pCloud replies 2297 — we surface needs2FA and the code is then
-// completed through loginWithPassword2FA (which must use plaintext, since the
-// digest flow has no way to carry the verification code).
-async function tryLogin(host, email, password) {
+// A stable per-browser device id. Persisted so `trustdevice` works: once a
+// device is trusted, pCloud's login stops demanding a 2FA code on it.
+const DEVICE_KEY = 'chordsheet:pcloud-deviceid';
+function deviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id = `chordsheet-${crypto.randomUUID()}`;
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+// One call to the `login` method (the only one that carries a 2FA code over
+// HTTP — userinfo can't). A fresh digest is fetched each call since it's
+// single-use, so the raw password stays local. `login` requires deviceid + os;
+// `extra` adds the 2FA params (token, code, trustdevice) on the second call.
+async function loginRequest(host, email, password, extra = {}) {
   const dg = await fetchJson(`https://${host}/getdigest`);
   if (dg.result !== 0 || !dg.digest) throw new Error('Could not start login');
   const inner = await sha1hex(email.toLowerCase());
@@ -117,12 +97,25 @@ async function tryLogin(host, email, password) {
     username: email.toLowerCase(),
     digest: dg.digest,
     passworddigest,
+    deviceid: deviceId(),
+    device: 'ChordSheet Web',
+    os: '4',
+    osversion: '1',
+    appversion: '1',
+    ...extra,
   });
-  const info = await fetchJson(`https://${host}/userinfo?${qs}`);
+  return fetchJson(`https://${host}/login?${qs}`);
+}
+
+async function tryLogin(host, email, password) {
+  const info = await loginRequest(host, email, password);
+  // 2297 = credentials accepted, account has 2FA. The reply carries a one-time
+  // token in `token`; the code is sent on a second login call alongside it.
   if (info.result === 2297) {
     const err = new Error('Two-factor authentication required');
     err.result = 2297;
     err.needs2FA = true;
+    err.tfatoken = info.token;
     throw err;
   }
   if (info.result !== 0 || !info.auth) {
@@ -135,8 +128,8 @@ async function tryLogin(host, email, password) {
 
 // Logs in and stores the token. Tries EU then US so the account region is
 // found automatically. Returns the host that worked.
-// Throws with err.needs2FA = true and err.host when 2FA is required — the
-// caller collects a code and calls loginWithPassword2FA().
+// Throws with err.needs2FA = true, err.host and err.tfatoken when 2FA is
+// required — the caller collects a code and calls loginWithPassword2FA().
 export async function loginWithPassword(email, password) {
   let lastErr;
   for (const host of LOGIN_HOSTS) {
@@ -155,18 +148,15 @@ export async function loginWithPassword(email, password) {
   throw lastErr || new Error('Login failed');
 }
 
-// Completes a 2FA login. pCloud's HTTP API accepts the verification code only
-// alongside a plaintext password (userinfo + password → 1022 "provide code",
-// then + code → auth). The digest flow can't carry a code, so this path sends
-// the password over HTTPS. host comes from the needs2FA error.
-export async function loginWithPassword2FA(host, email, password, code) {
-  const qs = new URLSearchParams({
-    getauth: '1',
-    username: email.toLowerCase(),
-    password,
+// Completes a 2FA login: re-runs the login call with the one-time `token` from
+// the needs2FA error plus the user's `code`. trustdevice=1 marks this device
+// (its persisted deviceid) trusted so future logins skip the 2FA prompt.
+export async function loginWithPassword2FA(host, email, password, tfatoken, code) {
+  const info = await loginRequest(host, email, password, {
+    token: tfatoken,
     code,
+    trustdevice: '1',
   });
-  const info = await fetchJson(`https://${host}/userinfo?${qs}`);
   if (info.result !== 0 || !info.auth) {
     const err = new Error(info.error || `2FA failed (${info.result})`);
     err.result = info.result;
