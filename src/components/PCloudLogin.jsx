@@ -24,7 +24,8 @@ export default function PCloudLogin({ onClose, onSuccess }) {
         setStep('totp');
         setBusy(false);
       } else {
-        setError('Login failed. Check your email and password.');
+        const c = err?.result != null ? `pCloud ${err.result}: ` : '';
+        setError(`Login failed — ${c}${err?.message || 'check your email and password.'}`);
         setBusy(false);
       }
     }
