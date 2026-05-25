@@ -34,15 +34,19 @@ export default function PCloudLogin({ onClose, onSuccess }) {
     e.preventDefault();
     const code = totpCode.replace(/\s/g, '');
     if (!code) return;
+    if (!tfa.current.tfatoken) {
+      setError('Login session expired (no 2FA token). Go back and sign in again.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await loginCloud2FA(tfa.current.host, tfa.current.tfatoken, code);
       onSuccess();
     } catch (err) {
-      setError(err?.result === 2294 || err?.result === 2274
-        ? 'Incorrect code — check your authenticator app and try again.'
-        : 'Verification failed. The code may have expired — go back and sign in again.');
+      // Surface the exact pCloud response so failures can be diagnosed precisely.
+      const code = err?.result != null ? `pCloud ${err.result}: ` : '';
+      setError(`Verification failed — ${code}${err?.message || 'unknown error'}`);
       setBusy(false);
     }
   }
