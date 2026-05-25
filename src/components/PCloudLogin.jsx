@@ -6,7 +6,7 @@ export default function PCloudLogin({ onClose, onSuccess }) {
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [step, setStep] = useState('credentials'); // 'credentials' | 'totp'
-  const tfaHost = useRef(null);
+  const tfa = useRef({ host: null, tfatoken: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -20,7 +20,7 @@ export default function PCloudLogin({ onClose, onSuccess }) {
       onSuccess();
     } catch (err) {
       if (err?.needs2FA) {
-        tfaHost.current = err.host;
+        tfa.current = { host: err.host, tfatoken: err.tfatoken };
         setStep('totp');
         setBusy(false);
       } else {
@@ -37,12 +37,12 @@ export default function PCloudLogin({ onClose, onSuccess }) {
     setBusy(true);
     setError(null);
     try {
-      await loginCloud2FA(email.trim(), password, tfaHost.current, code);
+      await loginCloud2FA(tfa.current.host, tfa.current.tfatoken, code);
       onSuccess();
     } catch (err) {
-      setError(err?.result === 2297
+      setError(err?.result === 2294 || err?.result === 2274
         ? 'Incorrect code — check your authenticator app and try again.'
-        : 'Verification failed. Try again.');
+        : 'Verification failed. The code may have expired — go back and sign in again.');
       setBusy(false);
     }
   }
