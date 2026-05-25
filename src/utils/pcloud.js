@@ -68,21 +68,24 @@ async function fetchJson(url, opts) {
 
 // ---- Direct email/password login -----------------------------------------
 
-async function tryLogin(host, email, password) {
+async function tryLogin(host, email, password, code = null) {
   const dg = await fetchJson(`https://${host}/getdigest`);
   if (dg.result !== 0 || !dg.digest) throw new Error('Could not start login');
   const inner = await sha1hex(email.toLowerCase());
   const passworddigest = await sha1hex(password + inner + dg.digest);
-  const qs = new URLSearchParams({
+  const params = {
     getauth: '1',
     username: email.toLowerCase(),
     digest: dg.digest,
     passworddigest,
-  });
+  };
+  if (code) params.code = code;
+  const qs = new URLSearchParams(params);
   const info = await fetchJson(`https://${host}/userinfo?${qs}`);
   if (info.result !== 0 || !info.auth) {
     const err = new Error(info.error || `Login failed (${info.result})`);
     err.result = info.result;
+    if (info.result === 2297) err.needs2FA = true;
     throw err;
   }
   return info.auth;
@@ -90,6 +93,8 @@ async function tryLogin(host, email, password) {
 
 // Logs in and stores the token. Tries EU then US so the account region is
 // found automatically. Returns the host that worked.
+// Throws with err.needs2FA = true and err.host when 2FA is required — the
+// caller should then collect a TOTP code and call loginWithPassword2FA().
 export async function loginWithPassword(email, password) {
   let lastErr;
   for (const host of LOGIN_HOSTS) {
@@ -98,10 +103,22 @@ export async function loginWithPassword(email, password) {
       setAuth({ token, host, param: 'auth' });
       return { host };
     } catch (err) {
+      if (err.needs2FA) {
+        err.host = host; // carry the host so the caller can retry on the right region
+        throw err;
+      }
       lastErr = err;
     }
   }
   throw lastErr || new Error('Login failed');
+}
+
+// Called after loginWithPassword threw needs2FA. host is err.host from that
+// error; code is the 6-digit TOTP from the user's authenticator app.
+export async function loginWithPassword2FA(email, password, host, code) {
+  const token = await tryLogin(host, email, password, code);
+  setAuth({ token, host, param: 'auth' });
+  return { host };
 }
 
 // ---- OAuth2 implicit flow (optional, needs a client id) -------------------
