@@ -27,6 +27,28 @@ export function disconnectCloud() {
   localStorage.removeItem(CACHE_KEY);
 }
 
+const MIGRATION_KEY = 'chordsheet:pcloud-migrated';
+
+// On the first connection from this browser, upload any songs that exist in
+// the local localStorage library so they're not abandoned when pCloud takes
+// over as the source of truth. Runs at most once per browser (flag-guarded).
+// Returns the number of songs successfully uploaded.
+export async function migrateLocalToPCloud() {
+  if (!pcloud.isConnected()) return 0;
+  if (localStorage.getItem(MIGRATION_KEY)) return 0;
+  const localSongs = loadLibrary();
+  let count = 0;
+  for (const song of localSongs) {
+    try {
+      const uploaded = await pcloud.saveSong({ id: null, metadata: song.metadata, text: song.text });
+      cacheSong(uploaded);
+      count++;
+    } catch { /* skip any that fail — they stay in local library as backup */ }
+  }
+  localStorage.setItem(MIGRATION_KEY, '1');
+  return count;
+}
+
 function readCache() {
   try {
     return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null') || { list: [], songs: {} };

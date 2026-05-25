@@ -10,6 +10,7 @@ import {
   connectCloud,
   disconnectCloud,
   handleCloudRedirect,
+  migrateLocalToPCloud,
 } from './utils/library';
 import { parseChordPro } from './utils/chordPro';
 import { computeFitScale } from './utils/pageBreaks';
@@ -33,7 +34,11 @@ export default function App() {
   // Capture a returning pCloud OAuth token (if any), then restore the draft.
   useEffect(() => {
     handleCloudRedirect();
-    setCloudConnected(isCloudConnected());
+    const connected = isCloudConnected();
+    setCloudConnected(connected);
+    // Silently upload any local library songs on the first connection from
+    // this browser so they're not stranded when pCloud takes over.
+    if (connected) migrateLocalToPCloud().catch(() => {});
     const draft = loadCurrent();
     if (draft) {
       setText(draft.text || '');
