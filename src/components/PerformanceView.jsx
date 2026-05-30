@@ -254,6 +254,14 @@ export default function PerformanceView({ songs, startIndex = 0, onExit }) {
           </p>
         ) : (
           <div className="max-w-4xl mx-auto pb-32">
+            {title && (
+              <h1
+                className={`font-sans font-bold mb-6 ${dark ? 'text-white' : 'text-gray-900'}`}
+                style={{ fontSize: fontPx * 1.5 }}
+              >
+                {title}
+              </h1>
+            )}
             <SongBody text={song?.text || ''} semitones={semitones} fontPx={fontPx} dark={dark} />
           </div>
         )}
