@@ -115,19 +115,23 @@ matches the actual style in `SongDocument.jsx`.** They drift easily.
 
 Auth has two paths, both ending in a stored `{ token, host, param }` where
 `param` is the query key to authenticate with (`auth` for login, `access_token`
-for OAuth):
+for OAuth). The Connect button (`handleConnectCloud` in `App.jsx`) chooses
+between them: OAuth when a client id is configured, the password modal otherwise.
 
-- **Direct login (default)** — `loginWithPassword(email, password)`. pCloud
-  digest auth: `getdigest` → `passworddigest = sha1(password + sha1(lower(email))
-  + digest)` → `userinfo?getauth=1` returns the token. The raw password never
-  leaves the browser; `crypto.subtle` does the SHA-1. Tries EU host then US so
-  the account region is found automatically. No client id needed. UI is the
-  `PCloudLogin` modal.
-- **OAuth2 implicit (optional, needs `VITE_PCLOUD_CLIENT_ID`)** — `connect()`
-  redirects to pCloud; `handleRedirect()` (called once on App mount) reads the
-  `access_token` + `locationid` off the URL and scrubs it. Kept for the future;
-  pCloud's app-registration page is frequently broken, which is why direct
-  login is the primary path. `locationid` 1 = US, 2 = EU.
+- **OAuth2 implicit (recommended, needs `VITE_PCLOUD_CLIENT_ID`)** — `connect()`
+  redirects to pCloud's own login page; `handleRedirect()` (called once on App
+  mount) reads the `access_token` + `locationid` off the URL and scrubs it.
+  pCloud handles the password *and any 2FA* in its UI, so this is the primary
+  path — set the env var (locally in `.env.local`, on Vercel as an env var) and
+  register every origin's redirect URI verbatim. `locationid` 1 = US, 2 = EU.
+- **Direct login (fallback, no client id)** — `loginWithPassword(email,
+  password)`. pCloud digest auth via the `login` method: `getdigest` →
+  `passworddigest = sha1(password + sha1(lower(email)) + digest)`, sent with a
+  persisted `deviceid` + `os`. The raw password never leaves the browser;
+  `crypto.subtle` does the SHA-1. Tries EU host then US so the region is found
+  automatically. UI is the `PCloudLogin` modal. 2FA accounts reply `2297` with a
+  one-time token (`loginWithPassword2FA`); this completion is unreliable, which
+  is why OAuth is preferred for 2FA accounts.
 
 A song's `id` in cloud mode **is its pCloud path** (`/ChordSheet/<title>.json`).
 Renaming the title writes a new file and deletes the old one. The library list
@@ -140,10 +144,12 @@ moves song records around; it never changes how a parsed song renders.
 ## Persistence keys (localStorage)
 
 ```
-chordsheet:current       → { text, metadata, currentId }   active draft, autosaved every change
-chordsheet:library       → [{ id, metadata, text, savedAt }, ...]   local-mode named songs
-chordsheet:pcloud-auth   → { access_token, host }          pCloud token + region host
-chordsheet:pcloud-cache  → { list: [...], songs: {...} }   offline mirror of pCloud songs
+chordsheet:current        → { text, metadata, currentId }   active draft, autosaved every change
+chordsheet:library        → [{ id, metadata, text, savedAt }, ...]   local-mode named songs
+chordsheet:pcloud-auth    → { token, host, param }          pCloud token, region host, query key
+chordsheet:pcloud-cache   → { list: [...], songs: {...} }   offline mirror of pCloud songs
+chordsheet:pcloud-deviceid → "chordsheet-<uuid>"            stable per-browser id for digest login
+chordsheet:pcloud-migrated → "1"                            guard: local→pCloud upload ran once
 ```
 
 Autosave is keyed off any change in `text`, `metadata`, or `currentId` —
