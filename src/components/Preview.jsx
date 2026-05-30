@@ -1,6 +1,15 @@
 import { Fragment } from 'react';
-import { attachSectionLabels } from '../utils/chordPro';
+import { attachSectionLabels, splitAnnotations } from '../utils/chordPro';
 import { computePageBreaks } from '../utils/pageBreaks';
+
+// Renders lyric text, coloring repeat markers like "(4x)" in the accent purple.
+function LyricText({ text }) {
+  return splitAnnotations(text).map((run, i) =>
+    run.marker
+      ? <span key={i} className="text-violet-600 font-bold">{run.text}</span>
+      : <Fragment key={i}>{run.text}</Fragment>
+  );
+}
 
 const BASE_CHORD_PX = 14;
 const BASE_LYRIC_PX = 16;
@@ -45,7 +54,7 @@ function ChordLine({ segments, scale }) {
             {seg.chord ? seg.chord + ' ' : ' '}
           </span>
           <span className="text-gray-800 leading-snug" style={{ fontSize: lyricPx }}>
-            {seg.text || ' '}
+            {seg.text ? <LyricText text={seg.text} /> : ' '}
           </span>
         </div>
       ))}
@@ -144,7 +153,7 @@ export default function Preview({ parsedLines, text, metadata, scale = 1 }) {
                 } else {
                   content = (
                     <div className="text-gray-800 font-mono" style={{ fontSize: lyricPx, marginBottom: 2 * scale }}>
-                      {line.segments?.[0]?.text || ''}
+                      <LyricText text={line.segments?.[0]?.text || ''} />
                     </div>
                   );
                 }

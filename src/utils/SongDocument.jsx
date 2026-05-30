@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { attachSectionLabels } from './chordPro';
+import { attachSectionLabels, splitAnnotations } from './chordPro';
 
 // Left page padding is reduced so the label column sits inside the margin.
 // Label col (40pt) + left padding (8pt) = 48pt — same content x-position as before.
@@ -91,10 +91,24 @@ function buildStyles(scale) {
       fontFamily: 'Courier',
       marginBottom: 2 * s,
     },
+    // Repeat markers like "(4x)" — accent purple, mirrors the preview.
+    markerText: {
+      color: '#7c3aed',
+      fontFamily: 'Courier-Bold',
+    },
     emptyLine: {
       marginBottom: 22 * s,
     },
   });
+}
+
+// Renders lyric text into one or more <Text> runs, coloring repeat markers.
+function lyricRuns(text, styles) {
+  return splitAnnotations(text).map((run, i) =>
+    run.marker
+      ? <Text key={i} style={styles.markerText}>{run.text}</Text>
+      : <Text key={i}>{run.text}</Text>
+  );
 }
 
 function ChordLine({ segments, styles }) {
@@ -106,7 +120,7 @@ function ChordLine({ segments, styles }) {
             {seg.chord ? seg.chord + ' ' : ' '}
           </Text>
           <Text style={styles.lyricText}>
-            {seg.text || ' '}
+            {seg.text ? lyricRuns(seg.text, styles) : ' '}
           </Text>
         </View>
       ))}
@@ -171,7 +185,7 @@ export function SongDocument({ metadata, parsedLines, scale = 1 }) {
             return (
               <BodyRow key={i} label={line.label} styles={styles}>
                 <Text style={styles.plainLyricLine}>
-                  {line.segments?.[0]?.text || ''}
+                  {lyricRuns(line.segments?.[0]?.text || '', styles)}
                 </Text>
               </BodyRow>
             );

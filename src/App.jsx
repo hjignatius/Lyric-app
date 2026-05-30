@@ -172,6 +172,11 @@ export default function App() {
               <p className="font-semibold text-gray-800 mb-1">Repeat a section</p>
               <code className="block bg-gray-50 rounded p-2 text-xs font-mono"># Chorus{'\n'}(define it once with lyrics){'\n\n'}# Chorus{'\n'}(repeat — leave empty to reuse)</code>
             </div>
+            <div>
+              <p className="font-semibold text-gray-800 mb-1">Repeat marker</p>
+              <code className="block bg-gray-50 rounded p-2 text-xs font-mono">A lovely day (4x)</code>
+              <p className="text-xs text-gray-400 mt-1"><code>(4x)</code> / <code>(x2)</code> are colored automatically.</p>
+            </div>
           </div>
         </details>
       </main>

@@ -63,6 +63,7 @@ other:
 - header alignment (`text-center` in preview vs `textAlign: 'center'` in PDF)
 - scale handling — both must accept `scale` and multiply *all* dimensional values by it
 - per-line vertical structure — chord row + lyric row stacked as a column per segment, never as two separate flex rows (this was the root cause of the chord-misalignment bug)
+- lyric runs — both render lyric text through `splitAnnotations()` so repeat markers like `(4x)` get the accent color (preview: violet span; PDF: `markerText` / `Courier-Bold`). `PerformanceView` does the same with a theme-aware color.
 
 If you change one without the other, the preview will lie about what the
 PDF looks like.
@@ -94,6 +95,7 @@ a fourth render path, run all three steps or it will disagree with the others.
 # Chorus (no body)     repeat — reuses the body defined under that label earlier
 [G]Amazing [D]grace    inline chords in brackets
 [G/B]slash chords      bass note transposes too
+A lovely day (4x)      repeat marker — (Nx)/(xN) colored purple via splitAnnotations()
 Plain lyric            line without brackets renders as lyric-only
                        (blank line) section spacer
 ```

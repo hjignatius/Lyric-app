@@ -75,6 +75,7 @@ What each piece does:
 | `[G/B]` | slash chord — both root and bass transpose |
 | `# Verse 1`, `# Chorus` | section label — appears in the left margin |
 | `# Chorus` *(again, with no body)* | repeat a section — reuses the lyrics/chords you defined under that label earlier |
+| `(4x)`, `(x2)` | repeat marker — colored in the accent purple automatically |
 | *(blank line)* | section spacer |
 | `Plain text line` | lyric line with no chords |
 

@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { parseChordPro, attachSectionLabels, expandSections } from '../utils/chordPro';
+import { parseChordPro, attachSectionLabels, expandSections, splitAnnotations } from '../utils/chordPro';
 import { transposeText } from '../utils/transpose';
+
+// Lyric text with repeat markers like "(4x)" colored in the accent (themed).
+function LyricText({ text, color }) {
+  return splitAnnotations(text).map((run, i) =>
+    run.marker
+      ? <span key={i} className="font-bold" style={{ color }}>{run.text}</span>
+      : <span key={i}>{run.text}</span>
+  );
+}
 
 // A distraction-free full-screen view for playing a song (or a setlist) live.
 // Big chords-over-lyrics, per-song transpose, adjustable text size, auto-scroll,
@@ -55,7 +64,7 @@ function SongBody({ text, semitones, fontPx, dark }) {
                       {seg.chord ? seg.chord + ' ' : ' '}
                     </span>
                     <span className="leading-snug" style={{ fontSize: fontPx }}>
-                      {seg.text || ' '}
+                      {seg.text ? <LyricText text={seg.text} color={chordColor} /> : ' '}
                     </span>
                   </div>
                 ))}
@@ -68,7 +77,7 @@ function SongBody({ text, semitones, fontPx, dark }) {
           <div key={i}>
             {label}
             <div className="leading-snug" style={{ fontSize: fontPx, marginBottom: fontPx * 0.2 }}>
-              {line.segments?.[0]?.text || ''}
+              <LyricText text={line.segments?.[0]?.text || ''} color={chordColor} />
             </div>
           </div>
         );

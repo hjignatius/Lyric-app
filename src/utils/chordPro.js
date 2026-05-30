@@ -59,6 +59,33 @@ export function hasChords(parsedLines) {
   return parsedLines.some(l => l.type === 'chords');
 }
 
+// Repeat markers like (4x), (x4), (2X), ( x 4 ) — performance annotations the
+// renderers color in the accent purple. Numeric-only so ordinary lyric
+// parentheses such as "(ooh)" are never matched.
+const REPEAT_MARKER = /\(\s*(?:\d{1,3}\s*[xX]|[xX]\s*\d{1,3})\s*\)/g;
+
+/**
+ * Split a lyric string into styled runs so every renderer can color repeat
+ * markers identically. Returns `[{ text, marker }]`; `marker:true` runs are
+ * recognized repeat markers. The characters are unchanged (only split), so
+ * chord-over-lyric alignment is preserved.
+ */
+export function splitAnnotations(text) {
+  const str = text || '';
+  const runs = [];
+  let last = 0;
+  let m;
+  REPEAT_MARKER.lastIndex = 0;
+  while ((m = REPEAT_MARKER.exec(str)) !== null) {
+    if (m.index > last) runs.push({ text: str.slice(last, m.index), marker: false });
+    runs.push({ text: m[0], marker: true });
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) runs.push({ text: str.slice(last), marker: false });
+  if (runs.length === 0) runs.push({ text: str, marker: false });
+  return runs;
+}
+
 /**
  * Attach each `comment` (section label) to the next non-empty content
  * line as a `label` property, and drop empty lines that directly follow
