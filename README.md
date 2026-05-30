@@ -74,8 +74,30 @@ What each piece does:
 | `[G]`, `[Dm7]`, `[Cmaj7]` | inline chord — appears above the next syllable |
 | `[G/B]` | slash chord — both root and bass transpose |
 | `# Verse 1`, `# Chorus` | section label — appears in the left margin |
+| `# Chorus` *(again, with no body)* | repeat a section — reuses the lyrics/chords you defined under that label earlier |
 | *(blank line)* | section spacer |
 | `Plain text line` | lyric line with no chords |
+
+### Repeating a section
+
+Choruses and some verses come back around. Define a section once with its
+label and body, then type the **same label again on its own** (no lines under
+it) to repeat it:
+
+```
+# Chorus
+[F]She's a sensitive [C]kind
+[Bb]Don't mess with her [Dm]mind
+
+# Verse 2
+[Dm]She'll be around...
+
+# Chorus
+```
+
+The second `# Chorus` is empty, so the preview, PDF, and performance mode all
+fill it in with the chorus you wrote above. Matching ignores case, and a label
+must be defined *before* you can repeat it.
 
 ## How it looks
 

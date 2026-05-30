@@ -14,7 +14,7 @@ import {
   isOAuthConfigured,
   connectCloudOAuth,
 } from './utils/library';
-import { parseChordPro } from './utils/chordPro';
+import { parseChordPro, expandSections } from './utils/chordPro';
 import { computeFitScale } from './utils/pageBreaks';
 import './index.css';
 
@@ -31,7 +31,7 @@ export default function App() {
   const [perform, setPerform] = useState(null); // { songs: [...], index } | null
   const hydrated = useRef(false);
 
-  const parsedLines = useMemo(() => parseChordPro(text || ''), [text]);
+  const parsedLines = useMemo(() => expandSections(parseChordPro(text || '')), [text]);
   const fitInfo = useMemo(() => computeFitScale(parsedLines, metadata), [parsedLines, metadata]);
   const activeScale = fitToOnePage ? fitInfo.scale : 1;
 
@@ -167,6 +167,10 @@ export default function App() {
             <div>
               <p className="font-semibold text-gray-800 mb-1">Plain lyrics (no chords)</p>
               <code className="block bg-gray-50 rounded p-2 text-xs font-mono">Just type the line without brackets</code>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 mb-1">Repeat a section</p>
+              <code className="block bg-gray-50 rounded p-2 text-xs font-mono"># Chorus{'\n'}(define it once with lyrics){'\n\n'}# Chorus{'\n'}(repeat — leave empty to reuse)</code>
             </div>
           </div>
         </details>

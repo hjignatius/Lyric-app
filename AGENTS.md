@@ -72,17 +72,26 @@ PDF looks like.
 1. Editor produces raw ChordPro text → stored as `text` state in `App.jsx`.
 2. `parseChordPro(text)` returns an array of `{ type, segments | text }` lines.
    Types: `'chords'`, `'lyrics'`, `'comment'`, `'empty'`, `'directive'`.
-3. `attachSectionLabels(parsedLines)` collapses each `comment` (`# Verse 1`)
+3. `expandSections(parsedLines)` expands repeated sections: a `# Label` with a
+   body *defines* it; the same `# Label` later with no body of its own is
+   replaced by the stored body (case-insensitive, backward-only). **Every render
+   path runs this right after parsing** — `App.jsx` (preview + fit/page-breaks),
+   `pdfExport.js` (PDF), and `PerformanceView.jsx` — so they never diverge.
+4. `attachSectionLabels(parsedLines)` collapses each `comment` (`# Verse 1`)
    onto the next non-empty content line as a `.label` property, and discards
    empty lines that immediately followed a label. **Both renderers call this
    before iterating.**
-4. Preview and PDF independently render the annotated lines.
+5. Preview and PDF independently render the annotated lines.
+
+The full pipeline is therefore **parse → expand → attach → render**. If you add
+a fourth render path, run all three steps or it will disagree with the others.
 
 ## ChordPro syntax supported
 
 ```
 {title: ...}           directive — currently ignored at render time
 # Verse 1              section label — appears in left margin
+# Chorus (no body)     repeat — reuses the body defined under that label earlier
 [G]Amazing [D]grace    inline chords in brackets
 [G/B]slash chords      bass note transposes too
 Plain lyric            line without brackets renders as lyric-only

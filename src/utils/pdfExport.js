@@ -1,9 +1,9 @@
 import { pdf } from '@react-pdf/renderer';
-import { parseChordPro } from './chordPro';
+import { parseChordPro, expandSections } from './chordPro';
 import { SongDocument } from './SongDocument';
 
 export async function exportToPdf(metadata, chordProText, { scale = 1 } = {}) {
-  const parsedLines = parseChordPro(chordProText);
+  const parsedLines = expandSections(parseChordPro(chordProText));
   const blob = await pdf(SongDocument({ metadata, parsedLines, scale })).toBlob();
 
   const url = URL.createObjectURL(blob);

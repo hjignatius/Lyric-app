@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { parseChordPro, attachSectionLabels } from '../utils/chordPro';
+import { parseChordPro, attachSectionLabels, expandSections } from '../utils/chordPro';
 import { transposeText } from '../utils/transpose';
 
 // A distraction-free full-screen view for playing a song (or a setlist) live.
@@ -16,7 +16,7 @@ const SCROLL_SPEEDS = [12, 24, 40, 64];
 
 function SongBody({ text, semitones, fontPx, dark }) {
   const transposed = transposeText(text, semitones, false);
-  const lines = attachSectionLabels(parseChordPro(transposed));
+  const lines = attachSectionLabels(expandSections(parseChordPro(transposed)));
   const chordColor = dark ? '#f0abfc' : '#7c3aed';
   const lyricColor = dark ? '#f3f4f6' : '#1f2937';
   const labelColor = dark ? '#a5b4fc' : '#7c3aed';

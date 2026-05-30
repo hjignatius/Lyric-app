@@ -83,3 +83,71 @@ export function attachSectionLabels(parsedLines) {
 
   return result;
 }
+
+/**
+ * Expand repeated section references.
+ *
+ * A section header (`# Chorus`) followed by body lines *defines* that section.
+ * Typing the same header again later with no body of its own *references* it,
+ * and gets expanded to the previously-defined body — so a chorus or verse can
+ * be repeated without retyping it.
+ *
+ * Rules:
+ *   - Matching is case-insensitive on the trimmed label (`# chorus` === `# Chorus`).
+ *   - Only *backward* references expand: a section must be defined before it can
+ *     be repeated. A bare header with no earlier definition is left untouched
+ *     (it stays an ordinary empty section label).
+ *   - The most recent definition of a label wins.
+ *
+ * Runs on parsed lines, before attachSectionLabels(), so every renderer
+ * (preview, PDF, performance) shares the same behaviour.
+ */
+export function expandSections(parsedLines) {
+  const defs = new Map(); // normalized label -> body content lines (no surrounding empties)
+  const out = [];
+  let i = 0;
+
+  while (i < parsedLines.length) {
+    const line = parsedLines[i];
+    if (line.type !== 'comment') {
+      out.push(line);
+      i++;
+      continue;
+    }
+
+    // Collect this section's body: every line up to the next section header.
+    let j = i + 1;
+    const body = [];
+    while (j < parsedLines.length && parsedLines[j].type !== 'comment') {
+      body.push(parsedLines[j]);
+      j++;
+    }
+
+    const key = line.text.trim().toLowerCase();
+    const hasContent = body.some(l => l.type !== 'empty');
+
+    if (hasContent) {
+      // Definition — remember its content, emit it exactly as written.
+      defs.set(key, trimSurroundingEmpties(body));
+      out.push(line, ...body);
+    } else if (key && defs.has(key)) {
+      // Reference — emit the header + stored body, then keep the writer's own
+      // trailing blank lines so the spacing before the next section is intact.
+      out.push(line, ...defs.get(key), ...body);
+    } else {
+      // Empty section with no prior definition — leave exactly as typed.
+      out.push(line, ...body);
+    }
+    i = j;
+  }
+
+  return out;
+}
+
+function trimSurroundingEmpties(lines) {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].type === 'empty') start++;
+  while (end > start && lines[end - 1].type === 'empty') end--;
+  return lines.slice(start, end);
+}
