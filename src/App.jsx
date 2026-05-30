@@ -4,6 +4,7 @@ import Editor from './components/Editor';
 import Preview from './components/Preview';
 import Toolbar from './components/Toolbar';
 import PCloudLogin from './components/PCloudLogin';
+import PerformanceView from './components/PerformanceView';
 import { loadCurrent, saveCurrent } from './utils/storage';
 import {
   isCloudConnected,
@@ -27,6 +28,7 @@ export default function App() {
   const [fitToOnePage, setFitToOnePage] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
   const [showCloudLogin, setShowCloudLogin] = useState(false);
+  const [perform, setPerform] = useState(null); // { songs: [...], index } | null
   const hydrated = useRef(false);
 
   const parsedLines = useMemo(() => parseChordPro(text || ''), [text]);
@@ -81,6 +83,10 @@ export default function App() {
     setCurrentId(song.id);
   }
 
+  function handlePerform(songs, index = 0) {
+    if (songs?.length) setPerform({ songs, index });
+  }
+
   function handleNewSong() {
     if (text.trim() && !confirm('Start a new song? Your current draft will be cleared (saved songs are kept).')) return;
     setText('');
@@ -124,6 +130,7 @@ export default function App() {
           cloudConnected={cloudConnected}
           onConnectCloud={handleConnectCloud}
           onDisconnectCloud={handleDisconnectCloud}
+          onPerform={handlePerform}
         />
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ minHeight: '420px' }}>
@@ -169,6 +176,14 @@ export default function App() {
         <PCloudLogin
           onClose={() => setShowCloudLogin(false)}
           onSuccess={handleCloudLoginSuccess}
+        />
+      )}
+
+      {perform && (
+        <PerformanceView
+          songs={perform.songs}
+          startIndex={perform.index}
+          onExit={() => setPerform(null)}
         />
       )}
     </div>

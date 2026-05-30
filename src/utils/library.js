@@ -13,9 +13,12 @@ import {
   loadLibrary,
   saveSongToLibrary,
   deleteSongFromLibrary,
+  loadSetlists,
+  writeSetlists,
 } from './storage';
 
 const CACHE_KEY = 'chordsheet:pcloud-cache';
+const SETLIST_CACHE_KEY = 'chordsheet:setlists-cache';
 
 export const isCloudConnected = pcloud.isConnected;
 export const loginCloud = pcloud.loginWithPassword;
@@ -28,6 +31,7 @@ export const connectCloudOAuth = pcloud.connect;
 export function disconnectCloud() {
   pcloud.disconnect();
   localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(SETLIST_CACHE_KEY);
 }
 
 const MIGRATION_KEY = 'chordsheet:pcloud-migrated';
@@ -142,4 +146,72 @@ export async function deleteSong(id) {
   }
   await pcloud.deleteSong(id);
   uncacheSong(id);
+}
+
+// ---- Setlists -------------------------------------------------------------
+// A setlist is { id, name, songIds: [...], savedAt }. songIds reference song
+// ids (a pCloud path in cloud mode). The whole collection is read and written
+// together — small enough that per-item diffing isn't worth it. In cloud mode
+// it's one pCloud file mirrored to a localStorage cache for offline use.
+
+function readSetlistCache() {
+  try {
+    return JSON.parse(localStorage.getItem(SETLIST_CACHE_KEY) || 'null') || [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSetlistCache(setlists) {
+  localStorage.setItem(SETLIST_CACHE_KEY, JSON.stringify(setlists));
+}
+
+export async function listSetlists() {
+  if (!pcloud.isConnected()) return loadSetlists();
+  try {
+    const setlists = await pcloud.loadSetlistsDoc();
+    writeSetlistCache(setlists);
+    return setlists;
+  } catch {
+    return readSetlistCache();
+  }
+}
+
+// Reads the authoritative collection for a read-modify-write. Unlike
+// listSetlists() this doesn't fall back to a stale cache, so a save/delete
+// never silently drops concurrent changes from the source of truth.
+async function readSetlistsForWrite() {
+  if (!pcloud.isConnected()) return loadSetlists();
+  return pcloud.loadSetlistsDoc();
+}
+
+async function writeAllSetlists(setlists) {
+  if (!pcloud.isConnected()) {
+    writeSetlists(setlists);
+    return;
+  }
+  await pcloud.saveSetlistsDoc(setlists);
+  writeSetlistCache(setlists);
+}
+
+// Creates or updates a setlist; returns the saved record (with its id).
+export async function saveSetlist({ id, name, songIds }) {
+  const setlists = await readSetlistsForWrite();
+  const now = Date.now();
+  const sid = id || `setlist_${now}_${Math.random().toString(36).slice(2, 7)}`;
+  const entry = {
+    id: sid,
+    name: name?.trim() || 'Untitled set',
+    songIds: songIds || [],
+    savedAt: now,
+  };
+  const idx = setlists.findIndex(s => s.id === sid);
+  if (idx >= 0) setlists[idx] = entry; else setlists.unshift(entry);
+  await writeAllSetlists(setlists);
+  return entry;
+}
+
+export async function deleteSetlist(id) {
+  const setlists = await readSetlistsForWrite();
+  await writeAllSetlists(setlists.filter(s => s.id !== id));
 }

@@ -271,3 +271,44 @@ export async function saveSong({ id, metadata, text }) {
 export async function deleteSong(path) {
   await apiGet('deletefile', { path });
 }
+
+// ---- Setlists -------------------------------------------------------------
+//
+// The whole setlist collection lives in one file inside a `/ChordSheet/Setlists`
+// subfolder. The subfolder keeps it out of listSongs() (which lists only files
+// directly in /ChordSheet), so setlists never show up as songs.
+
+const SETLIST_FOLDER = `${SONG_FOLDER}/Setlists`;
+const SETLIST_FILE = 'setlists.json';
+
+async function ensureSetlistFolder() {
+  await apiGet('createfolderifnotexists', { path: SETLIST_FOLDER });
+}
+
+// Returns the stored setlists array, or [] if none have been saved yet.
+export async function loadSetlistsDoc() {
+  await ensureSetlistFolder();
+  const data = await apiGet('listfolder', { path: SETLIST_FOLDER });
+  const file = (data.metadata?.contents || []).find(e => !e.isfolder && e.name === SETLIST_FILE);
+  if (!file) return [];
+  const link = await apiGet('getfilelink', { path: `${SETLIST_FOLDER}/${SETLIST_FILE}` });
+  const dlHost = link.hosts?.[0];
+  if (!dlHost) throw new Error('pCloud returned no download host');
+  const res = await fetch(`https://${dlHost}${link.path}`);
+  if (!res.ok) throw new Error(`pCloud download HTTP ${res.status}`);
+  const doc = await res.json();
+  return Array.isArray(doc?.setlists) ? doc.setlists : [];
+}
+
+export async function saveSetlistsDoc(setlists) {
+  await ensureSetlistFolder();
+  const { token, host, param } = requireAuth();
+  const blob = new Blob([JSON.stringify({ setlists }, null, 2)], { type: 'application/json' });
+  const form = new FormData();
+  form.append(SETLIST_FILE, blob, SETLIST_FILE);
+  const qs = new URLSearchParams({ [param]: token, path: SETLIST_FOLDER, nopartial: '1' });
+  const res = await fetch(`https://${host}/uploadfile?${qs}`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`pCloud upload HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.result !== 0) throw new Error(data.error || `pCloud upload error ${data.result}`);
+}

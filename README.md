@@ -21,6 +21,12 @@ browser automatically.
 - **Autosave** to `localStorage` — never lose work on reload
 - **Song library** — save multiple songs, load them back, delete the ones
   you don't need
+- **Setlists** — group songs into ordered, named sets (reorder, add, remove);
+  they sync through pCloud just like songs
+- **Performance mode** — a full-screen, distraction-free player for the stage:
+  large chords-over-lyrics, next/previous song navigation, on-the-fly transpose,
+  adjustable text size, hands-free auto-scroll, a dark/light toggle, and a
+  screen wake-lock so your device won't sleep mid-song
 - **Cross-device sync** (optional) — connect a pCloud account and your songs
   live as `.json` files in a `/ChordSheet` folder, available on every device.
   Works offline from a local cache once synced. No pCloud? It falls back to
@@ -91,6 +97,29 @@ Chorus    [F]She's a sensitive [C]kind
 
 The section labels (`Verse 1`, `Chorus`) sit in the left margin so they
 take zero vertical space — handy for fitting longer songs on one page.
+
+## Setlists & performance mode
+
+Click **Setlists** in the toolbar to build a named, ordered set: add songs from
+your library, reorder them with the ▲/▼ arrows, and remove what you don't need.
+Setlists save wherever your songs do — in pCloud when connected (so you can
+build a set on your laptop and perform from an iPad), or in `localStorage`
+otherwise.
+
+Hit **▶ Perform** on a setlist — or the **Perform** button for the song you're
+editing — to enter full-screen performance mode:
+
+- **Big chords-over-lyrics** with section headers, sized for reading at a
+  distance
+- **Navigate** between songs with the on-screen buttons or the **←/→** arrow
+  keys
+- **Transpose on the fly** per song (resets when you move to the next)
+- **Adjustable text size** (the `A−` / `A+` buttons or **+/−** keys)
+- **Auto-scroll** hands-free at four speeds (toggle with the button or
+  **spacebar**)
+- **Dark/light toggle** — dark by default for dim stages
+- **Screen stays awake** via the Wake Lock API where supported
+- **Esc** exits
 
 ## Sync across devices (pCloud + Vercel)
 

@@ -4,6 +4,7 @@
 
 const CURRENT_KEY = 'chordsheet:current';
 const LIBRARY_KEY = 'chordsheet:library';
+const SETLISTS_KEY = 'chordsheet:setlists';
 
 function safeParse(json, fallback) {
   if (!json) return fallback;
@@ -47,4 +48,15 @@ export function saveSongToLibrary({ id, metadata, text }) {
 
 export function deleteSongFromLibrary(id) {
   writeLibrary(loadLibrary().filter(s => s.id !== id));
+}
+
+// Setlists are an ordered collection: [{ id, name, songIds: [...], savedAt }].
+// Stored as one array (mirrors the cloud document) so the whole list is read
+// and written together.
+export function loadSetlists() {
+  return safeParse(localStorage.getItem(SETLISTS_KEY), []);
+}
+
+export function writeSetlists(setlists) {
+  localStorage.setItem(SETLISTS_KEY, JSON.stringify(setlists));
 }

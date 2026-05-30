@@ -35,18 +35,20 @@ src/
 ├── components/
 │   ├── Editor.jsx               raw ChordPro <textarea>
 │   ├── Preview.jsx              live HTML preview of the parsed song
-│   ├── Toolbar.jsx              transpose, notation, fit-to-page, library, export
+│   ├── Toolbar.jsx              transpose, notation, fit-to-page, library, setlists, perform, export
 │   ├── MetadataForm.jsx         title/artist/key/tempo + tap-tempo button
-│   └── SongLibrary.jsx          save/load/delete dropdown (Songs button)
+│   ├── SongLibrary.jsx          save/load/delete dropdown (Songs button)
+│   ├── SetlistManager.jsx       setlist list + editor dropdown (Setlists button)
+│   └── PerformanceView.jsx      full-screen stage player (overlay, owns its own state)
 └── utils/
     ├── chordPro.js              parser + attachSectionLabels()
     ├── transpose.js             semitone transposition incl. slash chords
     ├── pageBreaks.js            estimate where PDF pages break, compute fit scale
     ├── pdfExport.js             trigger blob download
     ├── SongDocument.jsx         @react-pdf document tree
-    ├── storage.js               localStorage helpers (draft + local library)
+    ├── storage.js               localStorage helpers (draft + local library + local setlists)
     ├── pcloud.js                pCloud OAuth + REST client (optional sync)
-    └── library.js               song-library facade: pCloud OR localStorage
+    └── library.js               song + setlist facade: pCloud OR localStorage
 ```
 
 ## The single most important invariant
@@ -141,6 +143,33 @@ is cheap (filenames + modified dates from `listfolder`); full content
 **The Preview/PDF invariant does not involve storage** — `library.js` only
 moves song records around; it never changes how a parsed song renders.
 
+## Setlists & performance mode
+
+Setlists ride the **same facade**. `library.js` exposes `listSetlists` /
+`saveSetlist` / `deleteSetlist`; a setlist is `{ id, name, songIds: [...],
+savedAt }` where `songIds` are song ids. Unlike songs (one file each), the whole
+collection is stored as a **single document** and read/written together:
+
+- **Cloud** → one file `/ChordSheet/Setlists/setlists.json` (a *subfolder*, so it
+  never shows up in `listSongs`, which lists only files directly in `/ChordSheet`).
+  Mirrored to a localStorage cache; `listSetlists` falls back to it offline.
+  Writes go through `readSetlistsForWrite()` (no cache fallback) so a concurrent
+  change isn't clobbered.
+- **Local** → `chordsheet:setlists` in `utils/storage.js`.
+
+Because a cloud song id is its path, **renaming a song breaks setlist
+references to it**. This is handled gracefully, not prevented: `SetlistManager`
+shows unresolved ids as "Missing song", and `PerformanceView` renders a
+placeholder so the set still plays through.
+
+`PerformanceView.jsx` is a full-screen overlay rendered by `App.jsx` when
+`perform` state is set (via `onPerform(songs, startIndex)` from the toolbar or a
+setlist's ▶). It owns its own transpose/text-size/auto-scroll/theme/wake-lock
+state and **does not** reuse `Preview.jsx` — it's a third, simpler rendering
+(section labels as inline headers, no page breaks) and is intentionally exempt
+from the Preview/PDF invariant. It reuses only the shared utilities
+(`parseChordPro`, `attachSectionLabels`, `transposeText`).
+
 ## Persistence keys (localStorage)
 
 ```
@@ -150,6 +179,8 @@ chordsheet:pcloud-auth    → { token, host, param }          pCloud token, regi
 chordsheet:pcloud-cache   → { list: [...], songs: {...} }   offline mirror of pCloud songs
 chordsheet:pcloud-deviceid → "chordsheet-<uuid>"            stable per-browser id for digest login
 chordsheet:pcloud-migrated → "1"                            guard: local→pCloud upload ran once
+chordsheet:setlists       → [{ id, name, songIds, savedAt }, ...]   local-mode setlists
+chordsheet:setlists-cache → [{ id, name, songIds, savedAt }, ...]   offline mirror of cloud setlists
 ```
 
 Autosave is keyed off any change in `text`, `metadata`, or `currentId` —
@@ -186,8 +217,9 @@ see the `useEffect` in `App.jsx`. Hydration on mount runs once via the
 - No chord diagrams / fretboard visualisation.
 - No audio playback, no metronome (the tap-tempo button just fills the BPM field).
 - No multi-page layout controls beyond shrink-to-fit one page.
-- No setlist or multi-song export (yet — cross-device sync via pCloud is the
-  groundwork for setlists + a performance mode).
+- No multi-song / setlist *PDF* export (setlists exist for performance mode, but
+  PDF export is still one song at a time).
+- No audio in performance mode — auto-scroll is timed, not synced to playback.
 
 Add any of these only with a clear user request — none of them are
 implied by the current UX.
