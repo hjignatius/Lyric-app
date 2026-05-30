@@ -20,9 +20,8 @@ const CACHE_KEY = 'chordsheet:pcloud-cache';
 export const isCloudConnected = pcloud.isConnected;
 export const loginCloud = pcloud.loginWithPassword;
 export const loginCloud2FA = pcloud.loginWithPassword2FA;
-export const probeComplete2FA = pcloud.probeComplete2FA;
 export const handleCloudRedirect = pcloud.handleRedirect;
-// OAuth path — kept for the future if pCloud's app registration starts working.
+// OAuth path — used when VITE_PCLOUD_CLIENT_ID is set (pCloud handles 2FA).
 export const isOAuthConfigured = pcloud.isOAuthConfigured;
 export const connectCloudOAuth = pcloud.connect;
 

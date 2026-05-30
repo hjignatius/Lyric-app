@@ -69,46 +69,6 @@ async function fetchJson(url, opts) {
   return res.json();
 }
 
-// ---- TEMPORARY 2FA completion probe ---------------------------------------
-// Sending password-digest + token + code to `login` still returns 2297, so the
-// completion call shape is wrong. Given one fresh code, fetch a token then try
-// the likely completion variants and report which yields an auth token.
-// Ordered most-likely-first so the single-use code hits the right one. Reports
-// result/error/auth-present only — never the auth or token values. To remove.
-export async function probeComplete2FA(email, password, code) {
-  const host = 'eapi.pcloud.com';
-  const user = email.toLowerCase();
-  const inner = await sha1hex(user);
-  const did = deviceId();
-  const base = `getauth=1&deviceid=${encodeURIComponent(did)}&device=ChordSheetWeb&os=4&osversion=1&appversion=1`;
-
-  // Step 1: fresh token bound to a fresh digest.
-  const dg = await fetchJson(`https://${host}/getdigest`);
-  const pd = await sha1hex(password + inner + dg.digest);
-  const s1 = await fetchJson(`https://${host}/login?${base}&username=${encodeURIComponent(user)}&digest=${dg.digest}&passworddigest=${pd}`);
-  if (s1.result !== 2297) return { step1: { result: s1.result, error: s1.error, auth: !!s1.auth } };
-  const token = s1.token;
-
-  const c = encodeURIComponent(code);
-  const t = encodeURIComponent(token);
-  const variants = [
-    ['user_token', `https://${host}/login?${base}&username=${encodeURIComponent(user)}&token=${t}&code=${c}&trustdevice=1`],
-    ['token_only', `https://${host}/login?${base}&token=${t}&code=${c}&trustdevice=1`],
-    ['tfa_login',  `https://${host}/tfa_login?${base}&token=${t}&code=${c}&trustdevice=1`],
-  ];
-  const out = { step1: '2297 token-ok' };
-  for (const [name, url] of variants) {
-    try {
-      const r = await fetchJson(url);
-      out[name] = { result: r.result, error: r.error, auth: !!r.auth };
-      if (r.result === 0 && r.auth) break; // found it — code is now consumed
-    } catch (e) {
-      out[name] = { error: e.message };
-    }
-  }
-  return out;
-}
-
 // ---- Direct email/password login -----------------------------------------
 
 // A stable per-browser device id. Persisted so `trustdevice` works: once a

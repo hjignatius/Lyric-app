@@ -10,6 +10,8 @@ import {
   disconnectCloud,
   handleCloudRedirect,
   migrateLocalToPCloud,
+  isOAuthConfigured,
+  connectCloudOAuth,
 } from './utils/library';
 import { parseChordPro } from './utils/chordPro';
 import { computeFitScale } from './utils/pageBreaks';
@@ -51,6 +53,13 @@ export default function App() {
   function handleDisconnectCloud() {
     disconnectCloud();
     setCloudConnected(false);
+  }
+
+  // With a client id configured, send the user through pCloud's own OAuth page
+  // (which handles 2FA natively); otherwise fall back to the password form.
+  function handleConnectCloud() {
+    if (isOAuthConfigured()) connectCloudOAuth();
+    else setShowCloudLogin(true);
   }
 
   function handleCloudLoginSuccess() {
@@ -113,7 +122,7 @@ export default function App() {
           fitInfo={fitInfo}
           activeScale={activeScale}
           cloudConnected={cloudConnected}
-          onConnectCloud={() => setShowCloudLogin(true)}
+          onConnectCloud={handleConnectCloud}
           onDisconnectCloud={handleDisconnectCloud}
         />
 
