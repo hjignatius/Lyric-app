@@ -72,8 +72,8 @@ export default function SongLibrary({
       const song = await loadSong(item);
       onLoad(song);
       setOpen(false);
-    } catch {
-      setError('Could not open this song');
+    } catch (err) {
+      setError(`Could not open this song: ${err.message}`);
     } finally {
       setBusyId(null);
     }
