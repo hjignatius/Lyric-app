@@ -235,26 +235,27 @@ export async function listSongs() {
     .sort((a, b) => b.savedAt - a.savedAt);
 }
 
-// Fetch a pCloud CDN URL, falling back to the Vercel proxy if the direct
-// request is blocked by CORS (common when running on localhost).
-async function fetchCdnJson(cdnUrl) {
-  let res;
-  try {
-    res = await fetch(cdnUrl);
-  } catch {
-    // CORS network error — route through the serverless proxy.
-    res = await fetch(`/api/pcloud-dl?url=${encodeURIComponent(cdnUrl)}`);
+// Load a pCloud file via the local proxy (/api/pcloud-load).
+// The proxy calls getfilelink AND fetches the CDN URL server-side so both
+// requests share one IP — required because pCloud CDN-locks links to the
+// IP that called getfilelink (causing "Invalid link referer" if a different
+// IP fetches the CDN URL).
+async function loadFileViaProxy(filePath) {
+  const { token, host, param } = requireAuth();
+  const qs = new URLSearchParams({ path: filePath, host, param });
+  const res = await fetch(`/api/pcloud-load?${qs}`, {
+    headers: { Authorization: token },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `load failed (${res.status})`);
   }
-  if (!res.ok) throw new Error(`pCloud download HTTP ${res.status}`);
   return res.json();
 }
 
 export async function loadSong(path) {
-  const link = await apiGet('getfilelink', { path });
-  const host = link.hosts?.[0];
-  if (!host) throw new Error('pCloud returned no download host');
-  const song = await fetchCdnJson(`https://${host}${link.path}`);
-  return { ...song, id: path };
+  const data = await loadFileViaProxy(path);
+  return { ...data, id: path };
 }
 
 export async function saveSong({ id, metadata, text }) {
@@ -303,10 +304,7 @@ export async function loadSetlistsDoc() {
   const data = await apiGet('listfolder', { path: SETLIST_FOLDER });
   const file = (data.metadata?.contents || []).find(e => !e.isfolder && e.name === SETLIST_FILE);
   if (!file) return [];
-  const link = await apiGet('getfilelink', { path: `${SETLIST_FOLDER}/${SETLIST_FILE}` });
-  const dlHost = link.hosts?.[0];
-  if (!dlHost) throw new Error('pCloud returned no download host');
-  const doc = await fetchCdnJson(`https://${dlHost}${link.path}`);
+  const doc = await loadFileViaProxy(`${SETLIST_FOLDER}/${SETLIST_FILE}`);
   return Array.isArray(doc?.setlists) ? doc.setlists : [];
 }
 
