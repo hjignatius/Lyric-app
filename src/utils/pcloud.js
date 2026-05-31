@@ -235,13 +235,25 @@ export async function listSongs() {
     .sort((a, b) => b.savedAt - a.savedAt);
 }
 
+// Fetch a pCloud CDN URL, falling back to the Vercel proxy if the direct
+// request is blocked by CORS (common when running on localhost).
+async function fetchCdnJson(cdnUrl) {
+  let res;
+  try {
+    res = await fetch(cdnUrl);
+  } catch {
+    // CORS network error — route through the serverless proxy.
+    res = await fetch(`/api/pcloud-dl?url=${encodeURIComponent(cdnUrl)}`);
+  }
+  if (!res.ok) throw new Error(`pCloud download HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function loadSong(path) {
   const link = await apiGet('getfilelink', { path });
   const host = link.hosts?.[0];
   if (!host) throw new Error('pCloud returned no download host');
-  const res = await fetch(`https://${host}${link.path}`);
-  if (!res.ok) throw new Error(`pCloud download HTTP ${res.status}`);
-  const song = await res.json();
+  const song = await fetchCdnJson(`https://${host}${link.path}`);
   return { ...song, id: path };
 }
 
@@ -294,9 +306,7 @@ export async function loadSetlistsDoc() {
   const link = await apiGet('getfilelink', { path: `${SETLIST_FOLDER}/${SETLIST_FILE}` });
   const dlHost = link.hosts?.[0];
   if (!dlHost) throw new Error('pCloud returned no download host');
-  const res = await fetch(`https://${dlHost}${link.path}`);
-  if (!res.ok) throw new Error(`pCloud download HTTP ${res.status}`);
-  const doc = await res.json();
+  const doc = await fetchCdnJson(`https://${dlHost}${link.path}`);
   return Array.isArray(doc?.setlists) ? doc.setlists : [];
 }
 
