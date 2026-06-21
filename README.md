@@ -209,4 +209,5 @@ visually in sync.
 
 ## License
 
-No license specified — all rights reserved by the author.
+Released under the [MIT License](./LICENSE) — free to use, copy, modify, and
+distribute, provided the copyright notice is kept.
