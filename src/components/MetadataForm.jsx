@@ -8,11 +8,17 @@ function TapTempo({ onBpm }) {
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
 
-  function playMetronome(bpm) {
+async function playMetronome(bpm) {
   const beats = 8;
   const interval = 60 / bpm;
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
   
+  // iOS requires resuming the audio context after creation
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+
   for (let i = 0; i < beats; i++) {
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
@@ -20,7 +26,7 @@ function TapTempo({ onBpm }) {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
-    oscillator.frequency.value = i === 0 ? 1000 : 800; // accent first beat
+    oscillator.frequency.value = i === 0 ? 1000 : 800;
     gainNode.gain.setValueAtTime(1, audioCtx.currentTime + i * interval);
     gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * interval + 0.05);
     
@@ -28,7 +34,12 @@ function TapTempo({ onBpm }) {
     oscillator.stop(audioCtx.currentTime + i * interval + 0.05);
   }
 }
-
+The key addition is the await audioCtx.resume() line which wakes up the audio context on iOS.
+Save the file, then push to GitHub:
+bashgit add .
+git commit -m "Fix metronome audio for iOS Safari"
+git push origin main
+Then wait a minute for Vercel to redeploy and test on your iPad!
   function handleTap() {
     const now = Date.now();
 
