@@ -8,6 +8,27 @@ function TapTempo({ onBpm }) {
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
 
+  function playMetronome(bpm) {
+  const beats = 8;
+  const interval = 60 / bpm;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  for (let i = 0; i < beats; i++) {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.frequency.value = i === 0 ? 1000 : 800; // accent first beat
+    gainNode.gain.setValueAtTime(1, audioCtx.currentTime + i * interval);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * interval + 0.05);
+    
+    oscillator.start(audioCtx.currentTime + i * interval);
+    oscillator.stop(audioCtx.currentTime + i * interval + 0.05);
+  }
+}
+
   function handleTap() {
     const now = Date.now();
 
@@ -37,18 +58,26 @@ function TapTempo({ onBpm }) {
     setDisplay(bpm);
     onBpm(String(bpm));
   }
-
-  return (
-    <button
-      type="button"
-      onPointerDown={handleTap}
-      className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none"
-      title="Tap in rhythm to detect BPM"
-    >
-      {display === null ? 'Tap' : display === '...' ? '...' : `${display} BPM`}
-    </button>
-  );
-}
+return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onPointerDown={handleTap}
+        className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none"
+        title="Tap in rhythm to detect BPM"
+      >
+        {display === null ? 'Tap' : display === '...' ? '...' : `${display} BPM`}
+      </button>
+      <button
+        type="button"
+        onClick={() => playMetronome(Number(display || 120))}
+        className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none"
+        title="Preview tempo with audio clicks"
+      >
+        Preview
+      </button>
+    </div>
+  );}
 
 export default function MetadataForm({ metadata, onChange }) {
   const field = (key, label, placeholder, extraClass = '') => (
