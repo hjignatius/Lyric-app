@@ -34,12 +34,6 @@ async function playMetronome(bpm) {
     oscillator.stop(audioCtx.currentTime + i * interval + 0.05);
   }
 }
-The key addition is the await audioCtx.resume() line which wakes up the audio context on iOS.
-Save the file, then push to GitHub:
-bashgit add .
-git commit -m "Fix metronome audio for iOS Safari"
-git push origin main
-Then wait a minute for Vercel to redeploy and test on your iPad!
   function handleTap() {
     const now = Date.now();
 
