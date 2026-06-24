@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 const RESET_AFTER_MS = 3000; // reset if no tap for 3 seconds
 const MIN_TAPS = 2;
@@ -7,19 +7,6 @@ function TapTempo({ onBpm }) {
   const tapsRef = useRef([]);
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
-  const audioCtxRef = useRef(null);
-
-  useEffect(() => {
-  const unlock = () => {
-    if (!audioCtxRef.current) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtxRef.current = new AudioContext();
-    }
-    audioCtxRef.current.resume();
-  };
-  document.addEventListener('touchstart', unlock, { once: true });
-  return () => document.removeEventListener('touchstart', unlock);
-}, []);
 
   function playMetronome(bpm) {
   const beats = 8;
@@ -43,11 +30,6 @@ function TapTempo({ onBpm }) {
 }
 
   function handleTap() {
-    if (!audioCtxRef.current) {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  audioCtxRef.current = new AudioContext();
-}
-audioCtxRef.current.resume();
     const now = Date.now();
 
     // Clear any pending reset timer and set a new one
@@ -88,13 +70,12 @@ return (
       </button>
       <button
         type="button"
-        onPointerDown={(e) => { e.preventDefault(); playMetronome(Number(display || 120)); }}
-        onTouchStart={(e) => { e.preventDefault(); playMetronome(Number(display || 120)); }}
-        className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none cursor-pointer"
+        onClick={() => playMetronome(Number(display || 120))}
+        className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none"
         title="Preview tempo with audio clicks"
->
-  Preview
-</button>
+      >
+        Preview
+      </button>
     </div>
   );}
 
