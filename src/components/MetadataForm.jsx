@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const RESET_AFTER_MS = 3000; // reset if no tap for 3 seconds
 const MIN_TAPS = 2;
@@ -8,6 +8,18 @@ function TapTempo({ onBpm }) {
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
   const audioCtxRef = useRef(null);
+
+  useEffect(() => {
+  const unlock = () => {
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtxRef.current = new AudioContext();
+    }
+    audioCtxRef.current.resume();
+  };
+  document.addEventListener('touchstart', unlock, { once: true });
+  return () => document.removeEventListener('touchstart', unlock);
+}, []);
 
   function playMetronome(bpm) {
   const beats = 8;
