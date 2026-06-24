@@ -8,33 +8,27 @@ function TapTempo({ onBpm }) {
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
 
-async function playMetronome(bpm) {
+  function playMetronome(bpm) {
   const beats = 8;
   const interval = 60 / bpm;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
-    await audioCtx.resume();
-
-    for (let i = 0; i < beats; i++) {
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      
-      oscillator.frequency.value = i === 0 ? 1000 : 800;
-      gainNode.gain.setValueAtTime(1, audioCtx.currentTime + i * interval);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * interval + 0.05);
-      
-      oscillator.start(audioCtx.currentTime + i * interval);
-      oscillator.stop(audioCtx.currentTime + i * interval + 0.05);
-    }
-  } catch (err) {
-    console.error('Audio error:', err);
+  for (let i = 0; i < beats; i++) {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.frequency.value = i === 0 ? 1000 : 800; // accent first beat
+    gainNode.gain.setValueAtTime(1, audioCtx.currentTime + i * interval);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * interval + 0.05);
+    
+    oscillator.start(audioCtx.currentTime + i * interval);
+    oscillator.stop(audioCtx.currentTime + i * interval + 0.05);
   }
 }
+
   function handleTap() {
     const now = Date.now();
 
