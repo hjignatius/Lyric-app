@@ -69,10 +69,10 @@ return (
         {display === null ? 'Tap' : display === '...' ? '...' : `${display} BPM`}
       </button>
       <button
-  type="button"
-  onClick={() => playMetronome(Number(display || 120))}
-  className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none cursor-pointer"
-  title="Preview tempo with audio clicks"
+        type="button"
+        onPointerDown={() => playMetronome(Number(display || 120))}
+        className="self-end px-3 py-2 text-sm font-semibold rounded-lg border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 active:scale-95 transition-all select-none touch-none cursor-pointer"
+        title="Preview tempo with audio clicks"
 >
   Preview
 </button>
