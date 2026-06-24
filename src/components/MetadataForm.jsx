@@ -7,6 +7,7 @@ function TapTempo({ onBpm }) {
   const tapsRef = useRef([]);
   const timerRef = useRef(null);
   const [display, setDisplay] = useState(null);
+  const audioCtxRef = useRef(null);
 
   function playMetronome(bpm) {
   const beats = 8;
@@ -30,6 +31,11 @@ function TapTempo({ onBpm }) {
 }
 
   function handleTap() {
+    if (!audioCtxRef.current) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  audioCtxRef.current = new AudioContext();
+}
+audioCtxRef.current.resume();
     const now = Date.now();
 
     // Clear any pending reset timer and set a new one
